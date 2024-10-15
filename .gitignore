@@ -1,0 +1,9 @@
+# macos cringe
+.DS_Store 
+
+# latex stuffs
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
