@@ -1,0 +1,30 @@
+var := x -- some variable represented however 
+-- expressions, have meaning from evaluation
+expr := x -- can be a variable
+      | \x -> expr -- lambda abstraction
+      | (e1 e2) -- application
+      | let x = e1 in e2 -- let generalization, although should only allow polymorphism on top level? not sure
+      | primitive literals (int, char, bool?)
+      | case e1 of [pattern{a,b,c}, \a -> \b -> \c -> e2] -- pattern matching. 
+      
+-- less sure about how this will look
+pattern{a,b,c} := Literal -- looks for an exact match
+                | TC a b c -- matches & deconstructs type constructor
+                | a@(pattern{b,c,..}) -- binds inner match if matched
+
+-- top level expressions, are allowed to be polymorphic 
+tlexpr := letrec x = e1 -- top level expressions should only be lets/declarations.
+
+-- types fairly standard. 
+type := T -- general monotype
+      | T1 -> T2 -- function type
+      | Forall a,b,... => T -- quantified type, prob only introduced by let generalizations?
+      | TC a b c.. -- constructed type
+
+-- top level statements introducing a new type
+typedef := t1 ~ t2 -- type alias - this can prob be handled in syntactic sugar actually?
+         | A [a1,a2,..] <~ TC1 [a1,a2,..] | TC2 [a1,..] | ... -- higher kinded type constructors, similar to haskell's data types
+
+-- top level statements that make up a program/module (note that exprs could still be evaluated in a REPL-type env)
+statement := tlexpr | typedef 
+program := [statement]..
