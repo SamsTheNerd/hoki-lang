@@ -7,8 +7,8 @@ data Expr = EVar Ident -- variable, defined by substitution
           | ELambda Ident Expr --- lambda abstraction of var over an expression
           | EApp Expr Expr -- application (e1 e2) in that order
           | ELit Literal -- a primitive literal
-          | ECase [(Pattern, Expr)] -- a case expression. runs down the list of patterns, finds the first that matches, and runs the expression with the appropriate variables bound
-          | ECons DataCons [Expr] -- a data expression, may not be fully extantiated ? in which case it has a type TArrow 
+          | ECase Expr [(Pattern, Expr)] -- a case expression. runs down the list of patterns, finds the first that matches, and runs the expression with the appropriate variables bound
+          | ECons Ident [Expr] -- a data expression, should be fully instantiated here, otherwise it should be a series of lambdas
     deriving (Eq)
 
 type TVar = String
@@ -52,6 +52,7 @@ data Pattern = PLit Expr -- match for equality ? idk if we can actually support 
 data Statement = STypeDef TypeCons 
                | SLetRec  Ident Expr (Maybe Type) -- letrec binding expression to the identifier (with optional type annotation for polymorphic declarations)
                -- TODO: imports ? or have those just flatten down to statements
+               deriving (Show, Eq)
 
 type Program = [Statement] -- a program is a series of statements in no particular order
 
@@ -62,6 +63,7 @@ instance Show Expr where
     show (ELambda x body) = "\\" ++ x ++ " -> " ++ show body
     show (EApp fn arg) = "(" ++ show fn ++ " " ++ show arg ++ ")"
     show (ELit (LInt x)) = show x
+    show (ECons id expr) = id ++ "#" ++ show expr
 
 instance Show Type where
     show (TVar v) = v

@@ -1,5 +1,5 @@
 module CoreLang.Runad where
-import Data.Map
+import Data.Map ( empty, insert, lookup, Map )
 import CoreLang.CoreSorts
 import Control.Monad
 
@@ -8,6 +8,8 @@ import Control.Monad
 
 -- a substitution map of variables to expressions
 type VarEnv = Map Ident Expr
+
+type DCLookup = Map Ident DataCons -- map of datacons names to DataCons to be used for pattern matching
 
 type EError = String
 
@@ -108,3 +110,22 @@ lookupVar' v = do
 extendVarEnv :: Ident -> Expr -> Runad a -> Runad a
 extendVarEnv v expr inad = Runad $ \(RunadSTIn env fint) -> 
     runRunAd inad (RunadSTIn (insert v expr env) fint)
+
+
+-- load from Program (assume any errors were thrown during type checking load)
+
+loadProgEnv :: Program -> (VarEnv, DCLookup)
+loadProgEnv = foldr loadStatementREnv (empty, empty)
+
+-- loads a single statement into the env
+loadStatementREnv :: Statement -> (VarEnv, DCLookup) -> (VarEnv, DCLookup)
+loadStatementREnv stmt@(SLetRec vid bexp annot) (venv, dcl) = (insert vid bexp venv, dcl)
+loadStatementREnv stmt@(STypeDef (TypeCons _ _ dcs)) (venv, dcl) 
+    = foldr (\dc@(DataCons did _) 
+        (venv', dcl') -> (insert did (mkDCLambda dc) venv', insert did dc dcl'))
+        (venv, dcl) dcs
+
+-- makes a lambda to be used for constructing datacons
+mkDCLambda :: DataCons -> Expr
+mkDCLambda dc@(DataCons did ts) = foldr ELambda (ECons did (map EVar mts)) mts
+    where mts = zipWith (\_ i -> "dc" ++ show i) ts (iterate (+1) 0) -- labeled identifiers
