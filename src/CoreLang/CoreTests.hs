@@ -26,13 +26,10 @@ testEval (str,exp) =
     where expr' = parseExpr str
           exprPretty = case expr' of
             (Left err) -> "parse error"
-            (Right expr) -> prettyExpr expr
+            (Right expr) -> show expr
           resIO = case expr' of 
             (Left err) -> (return . show) err
-            (Right expr) -> (return . prettyExpr . fst . fullEval) expr
-        --   resIO = case (fullEval expr) of
-        --     (Left err) -> (return . show) err
-        --     (Right )
+            (Right expr) -> either show id <$> fullEval expr
 
 runEvalTests :: IO ()
 runEvalTests = mapM_ testEval evalTests

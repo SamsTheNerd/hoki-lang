@@ -9,7 +9,7 @@ data Expr = EVar Ident -- variable, defined by substitution
           | ELit Literal -- a primitive literal
           | ECase [(Pattern, Expr)] -- a case expression. runs down the list of patterns, finds the first that matches, and runs the expression with the appropriate variables bound
           | ECons DataCons [Expr] -- a data expression, may not be fully extantiated ? in which case it has a type TArrow 
-    deriving (Show, Eq)
+    deriving (Eq)
 
 type TVar = String
 
@@ -18,8 +18,9 @@ data Type = TVar TVar
           | TArrow Type Type
           | TQuant [(TVar, TConstraint)] Type
           | TMetaVar Int
-          | TCon TypeCons [Type] -- a constructed type - should generally be fully instantiated, so kind *, but may be instantiated with placeholder typevars. TBD how to handle it if/when we get to typeclasses
-        deriving (Show, Eq)
+        --   | TCon TypeCons [Type] -- a constructed type - should generally be fully instantiated, so kind *, but may be instantiated with placeholder typevars. TBD how to handle it if/when we get to typeclasses
+          | TCon Ident [Type] -- a constructed type - should generally be fully instantiated, so kind *, but may be instantiated with placeholder typevars. TBD how to handle it if/when we get to typeclasses
+        deriving (Eq)
 
 -- a (possibly higher kinded) type constructor 
 data TypeCons = TypeCons Ident [TVar] [DataCons] -- 
@@ -45,11 +46,28 @@ data Pattern = PLit Expr -- match for equality ? idk if we can actually support 
              | PAny
              | PVar Ident -- matches any expression, binds it to the variable
              | PLabel Ident Pattern -- matches the given pattern, binds it to the variable if matches
-             | PCons 
+             | PCons Ident [Pattern]
     deriving (Show, Eq)
 
 data Statement = STypeDef TypeCons 
                | SLetRec  Ident Expr (Maybe Type) -- letrec binding expression to the identifier (with optional type annotation for polymorphic declarations)
-               -- TODO: imports ?
+               -- TODO: imports ? or have those just flatten down to statements
 
 type Program = [Statement] -- a program is a series of statements in no particular order
+
+-- api/header-y bits end here!
+
+instance Show Expr where
+    show (EVar v) = v
+    show (ELambda x body) = "\\" ++ x ++ " -> " ++ show body
+    show (EApp fn arg) = "(" ++ show fn ++ " " ++ show arg ++ ")"
+    show (ELit (LInt x)) = show x
+
+instance Show Type where
+    show (TVar v) = v
+    show (TArrow f t@(TArrow _ _)) = show f ++ " -> (" ++ show t ++ ")" 
+    show (TArrow f t) = show f ++ " -> " ++ show t
+    show (TMetaVar i) = "meta@" ++ show i
+    show (TQuant cs body) = "forall" ++
+        foldMap ((" "++) . fst) cs ++ " => " ++ show body
+    show (TCon id holes) = id ++ foldMap ((" "++). show) holes
