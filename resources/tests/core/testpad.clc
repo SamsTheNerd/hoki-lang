@@ -11,12 +11,12 @@ data List a = Cons a (List a) | Empty;
 
 let sum = \l -> case l of
     Empty -> 0;
-    (Cons x xs) -> ((intAdd x) (sum xs));
+    (Cons x xs) -> (intAdd x) (sum xs);
 
-let nums = ((Cons 2) ((Cons 1) Empty))
+let nums = (Cons 4 (Cons 3 (Cons 2 (Cons 1 Empty))))
 
 let last = \l -> case l of
     (Cons x Empty) -> x;
     (Cons x xs) -> (last xs);
 
-let main = (sum nums)
+let main = sum nums

@@ -37,7 +37,9 @@ varP = EVar <$> identP
 
 -- parse an application
 appP :: Parser Expr
-appP = do char '('; fn <- exprP; bSpaces1; res <- EApp fn <$> exprP; char ')'; return res
+-- appP = do char '('; fn <- exprP; bSpaces1; res <- EApp fn <$> exprP; char ')'; return res
+appP = do
+    chainl1 (try exprButNotAppP) (EApp <$ try bSpaces1)
 
 eCaseP :: Parser Expr
 eCaseP = do
@@ -57,6 +59,9 @@ eCaseP = do
 -- parse parenthesis
 wrapParens :: Parser a -> Parser a
 wrapParens p = do char '('; bSpaces; res <- p; bSpaces; char ')'; return res
+
+exprButNotAppP :: Parser Expr
+exprButNotAppP = try exprLitP <|> try lambdaP <|> eCaseP <|> try varP <|> wrapParens exprP
 
 -- parse an expression
 exprP :: Parser Expr
