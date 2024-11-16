@@ -1,3 +1,5 @@
+import resources/tests/core/tuples.clc
+
 data List a = Cons a (List a) | Empty;
 
 let head = \l -> case l of
