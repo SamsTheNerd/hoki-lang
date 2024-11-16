@@ -3,7 +3,7 @@ import CoreLang.CoreParser
 import CoreLang.CoreEval
 import CoreLang.CoreSorts
 import Data.Bifoldable (Bifoldable(bifoldMap))
-import CoreLang.PrimLoader (evalProgram)
+import CoreLang.CoreLoader (evalProgram)
 
 -- eval tests
 

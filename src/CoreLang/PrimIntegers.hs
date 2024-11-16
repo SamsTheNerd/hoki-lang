@@ -5,11 +5,11 @@ import CoreLang.Runad
 import CoreLang.CoreEval
 import Control.Monad ((>=>))
 
-primIntOps :: [(String, Expr)]
+primIntOps :: [Statement]
 primIntOps = [
-    ("intAdd", EPrimOp intAdd),
-    ("intMul", EPrimOp intMul),
-    ("intNeg", EPrimOp intNeg)
+    SLetRec "intAdd" (EPrimOp intAdd) Nothing,
+    SLetRec "intMul" (EPrimOp intMul) Nothing,
+    SLetRec "intNeg" (EPrimOp intNeg) Nothing
     ]
 
 getAsInt :: Expr -> Runad Int

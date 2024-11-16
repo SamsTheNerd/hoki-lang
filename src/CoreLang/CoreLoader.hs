@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module CoreLang.PrimLoader where
 
 import CoreLang.PrimIntegers
@@ -5,21 +6,42 @@ import CoreLang.CoreSorts
 import Data.Map (insert, fromList, empty)
 import CoreLang.Runad
 import CoreLang.CoreEval (eval)
+import Data.List ((\\))
+import CoreLang.CoreParser
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Except
 
 -- gathering primitve groups
 
-primGroups :: [[(String, Expr)]]
+primGroups :: [ProgLink]
 primGroups = [
-    primIntOps
+    Direct "primOps" primIntOps
     ]
 
-allPrimOps :: [(String, Expr)]
-allPrimOps = concat primGroups
+coreLibs = [
+    "lists"
+    ]
 
 -- load Runad Env from Program (assume any errors were thrown during type checking load)
+defaultImports :: [ProgLink]
+defaultImports = primGroups ++ map CoreLib coreLibs
+
+-- gatherImports takes a set of already found imports, imports to newly load, and returns a set of all fully loaded imports as well as the loaded programs
+gatherImports :: [ProgLink] -> [ProgLink] -> IO (Either String [(ProgLink, Program)])
+gatherImports found finding = undefined
+    where finding' = finding \\ found -- make sure we're not loading any we've already found
+-- gatherImports prog = 
+--     let imps = Data.Set.fromList $ concatMap (\case (SImport pl) -> [pl]; _ -> []) prog
+
+-- shallow !
+getModuleDeps :: Program -> [ProgLink]
+getModuleDeps = concatMap (\case (SImport pl) -> [pl]; _ -> [])
+
+loadProgImport :: ProgLink -> ExceptT IO Program
+loadProgImport (Direct _ prog) -> 
 
 loadProgEnv :: Program -> (VarEnv, DCLookup)
-loadProgEnv = foldr loadStatementREnv (fromList allPrimOps, empty)
+loadProgEnv = foldr loadStatementREnv (empty, empty)
 
 -- loads a single statement into the env
 loadStatementREnv :: Statement -> (VarEnv, DCLookup) -> (VarEnv, DCLookup)

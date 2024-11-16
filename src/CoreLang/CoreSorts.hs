@@ -54,9 +54,16 @@ data Pattern = PLit Expr -- match for equality ? idk if we can actually support 
              | PCons Ident [Pattern]
     deriving (Show)
 
+-- TODO: namespaces? idk
+-- a way to link to another program/chunk -- These are *very* TBD/unstable
+data ProgLink = CoreLib String -- pulls from resources/lib/String.clc -- TODO: set up Cabal or something ?
+                | LocalFile FilePath -- pulls from a local file
+                | Direct String Program -- not entirely sure what this is for. i suppose just prims
+                deriving (Show)
+
 data Statement = STypeDef TypeCons 
                | SLetRec  Ident Expr (Maybe Type) -- letrec binding expression to the identifier (with optional type annotation for polymorphic declarations)
-               -- TODO: imports ? or have those just flatten down to statements
+               | SImport ProgLink
                deriving (Show)
 
 type Program = [Statement] -- a program is a series of statements in no particular order
@@ -82,6 +89,12 @@ instance Show Type where
     show (TQuant cs body) = "forall" ++
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
     show (TCon id holes) = id ++ foldMap ((" "++). show) holes
+
+instance Eq ProgLink where
+    (CoreLib l1) == (CoreLib l2) = l1 == l2
+    (LocalFile f1) == (LocalFile f2) = f1 == f2
+    (Direct n1 _) == (Direct n2 _) = n1 == n2
+    _ == _ = False
 
 -- some data types defined here to avoid circular deps
 
