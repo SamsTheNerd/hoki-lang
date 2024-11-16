@@ -1,0 +1,22 @@
+
+# let id = \x -> x
+
+# let comp = \f -> \g -> \x -> (f (g x))
+
+# let two = 2
+
+# let basicCalc = ((intMul 4) (intNeg two))
+
+data List a = Cons a (List a) | Empty;
+
+let sum = \l -> case l of
+    Empty -> 0;
+    (Cons x xs) -> ((intAdd x) (sum xs));
+
+let nums = ((Cons 2) ((Cons 1) Empty))
+
+let last = \l -> case l of
+    (Cons x Empty) -> x;
+    (Cons x xs) -> (last xs);
+
+let main = (sum nums)

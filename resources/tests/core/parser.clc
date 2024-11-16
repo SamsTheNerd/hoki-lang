@@ -1,8 +1,6 @@
 let id = \x -> x
 let test = boop
 
-
-
 # comment!
 
 let id :: t1 -> t1 # shhhh

@@ -3,6 +3,7 @@ import Text.Parsec.String
 import CoreLang.CoreSorts
 import Text.Parsec.Error
 import Text.Parsec
+import Data.Functor (($>))
 
 -- mostly just to test core lang
 
@@ -22,9 +23,9 @@ exprLitP = try intP
 lambdaP :: Parser Expr
 lambdaP = do
     char '\\' -- start with backslash
-    v <- lower; vs <- many alphaNum -- parse the var
-    bSpaces; string "->"; bSpaces -- have the function arrow
-    ELambda (v:vs) <$> exprP -- parse the body and make the lambda
+    v <- identP
+    bSpaces; string "->"; bSpaces; -- have the function arrow
+    ELambda v <$> exprP -- parse the body and make the lambda
 
 identP :: Parser String
 -- identP = do v <- lower; vs <- many alphaNum; return (v:vs)
@@ -36,18 +37,21 @@ varP = EVar <$> identP
 
 -- parse an application
 appP :: Parser Expr
-appP = do char '('; fn <- exprP; skipMany1 space; res <- EApp fn <$> exprP; char ')'; return res
+appP = do char '('; fn <- exprP; bSpaces1; res <- EApp fn <$> exprP; char ')'; return res
 
 eCaseP :: Parser Expr
 eCaseP = do
-    string "case "; bSpaces
-    exp <- exprP; bSpaces 
-    string "of"; bSpaces
-    cases <- many1 (do
-        pat <- patternP; bSpaces 
+    string "case"; bSpaces1
+    exp <- exprP; bSpaces1
+    string "of";
+    cases <- (many1 . try ) $ do
+        bSpaces1
+        pat <- patternP; bSpaces
         string "->"; bSpaces
-        fun <- exprP; bSpaces; (endOfLine)
-        return $ (pat, fun))
+        fun <- exprP; 
+        -- skipMany1 (char ';')
+        optional $ char ';'
+        return (pat, fun)
     return $ ECase exp cases
 
 -- parse parenthesis
@@ -56,7 +60,7 @@ wrapParens p = do char '('; bSpaces; res <- p; bSpaces; char ')'; return res
 
 -- parse an expression
 exprP :: Parser Expr
-exprP = try varP <|> try exprLitP <|> try lambdaP <|> try appP <|> eCaseP <|> wrapParens exprP
+exprP = try exprLitP <|> try lambdaP <|> try appP <|> eCaseP <|> try varP <|> wrapParens exprP
 
 -- type parsers
 
@@ -92,7 +96,7 @@ tConP = do
     return $ TCon name args
 
 typeButNotArrowP :: Parser Type
-typeButNotArrowP = try tQuantP <|> try tConP <|> try tVarP
+typeButNotArrowP = try tQuantP <|> try tConP <|> try tVarP <|> wrapParens typeButNotArrowP
 
 typeP :: Parser Type
 typeP = try tArrowP <|> try typeButNotArrowP
@@ -120,7 +124,7 @@ patConsP = do
     bSpaces
     name <- identP
     bSpaces
-    pats <- many1 patternP 
+    pats <- (many1 .try) (bSpaces >> patternP)
     bSpaces
     char ')'
     return $ PCons name pats
@@ -149,6 +153,9 @@ dataconP :: Parser DataCons
 dataconP = do
     name <- identP
     args <- many (try $ bSpaces >> typeP)
+    -- bSpaces
+    -- args <- chainl ((:[]) <$> typeP) ((<>) <$ try bSpaces) []
+    -- bSpaces
     return $ DataCons name args
 
 typeconsP :: Parser TypeCons
@@ -160,6 +167,7 @@ typeconsP = do
     char '='
     bSpaces
     dcs <- chainl1 ((:[]) <$> dataconP) ((<>) <$ try (do bSpaces; char '|'; bSpaces))
+    char ';'
     return $ TypeCons name gens dcs
 
 -- dealing with parsing whole files now
@@ -183,20 +191,30 @@ tlLetP = do
 
 programP :: Parser Program
 programP = do 
+    bSpaces
     chainl ((:[]) <$> (
         try tlLetP 
         <|> (STypeDef <$> typeconsP))
         <|> ([] <$ try (char '#' >> many (noneOf ['\n', '\r'])) ) -- comments!
         <|> ([] <$ eof ) -- end!
-        ) ((<>) <$ try (space >> many (endOfLine <|> space))) []
+        ) ((<>) <$ try bSpaces1) []
+
+readProgramFile :: FilePath -> IO (Either ParseError Program)
+readProgramFile fn = parseFromFile programP fn
 
 -- breakable spacing
-bSpaces :: Parser ()
-bSpaces = skipMany (
-    try space
-    <|> try (char '#' >> many (noneOf ['\n', '\r']) >> endOfLine) -- comments!
-    <|> try tab 
+
+bSpaces_ :: Parser Char
+bSpaces_ = (char '#' >> many (noneOf ['\n', '\r']) $> ' ') -- comments!
     -- can have new endOfLines but they must be followed by an indent (TODO: only on scope change?)
     <|> try (endOfLine >> tab)
-    <|> try (endOfLine >> (' '<$ many1 space))
-    )
+    <|> try (endOfLine >> (' ' <$ many1 space))
+    <|> tab 
+    <|> space
+    
+
+bSpaces :: Parser ()
+bSpaces = skipMany bSpaces_
+
+bSpaces1 :: Parser ()
+bSpaces1 = skipMany1 bSpaces_

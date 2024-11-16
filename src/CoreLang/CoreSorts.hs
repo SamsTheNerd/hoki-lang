@@ -1,4 +1,5 @@
 module CoreLang.CoreSorts where
+import Data.Map (Map)
 
 -- loosely based on Data.hs from ps7 to start with
 type Ident = String -- maybe want something More here?
@@ -6,10 +7,11 @@ type Ident = String -- maybe want something More here?
 data Expr = EVar Ident -- variable, defined by substitution
           | ELambda Ident Expr --- lambda abstraction of var over an expression
           | EApp Expr Expr -- application (e1 e2) in that order
-          | ELit Literal -- a primitive literal
           | ECase Expr [(Pattern, Expr)] -- a case expression. runs down the list of patterns, finds the first that matches, and runs the expression with the appropriate variables bound
           | ECons Ident [Expr] -- a data expression, should be fully instantiated here, otherwise it should be a series of lambdas
-    deriving (Eq)
+          | ELit Literal -- a primitive literal
+          | EPrimOp PrimOp-- primitive low level functions 
+
 
 type TVar = String
 
@@ -41,18 +43,21 @@ data Literal = LInt Int
              | LChar Char
             deriving (Show, Eq)
 
+-- currently this prevents Expressions from being equality check-able
+data PrimOp = PrimOp (Expr -> Runad Expr) -- will add more type checker bits here
+
 -- a pattern that tries to match an expression 
 data Pattern = PLit Expr -- match for equality ? idk if we can actually support that reliably
              | PAny
-             | PVar Ident -- matches any expression, binds it to the variable
+             | PVar Ident -- matches any expression, binds it to the variable (this could probably be done with just label any)
              | PLabel Ident Pattern -- matches the given pattern, binds it to the variable if matches
              | PCons Ident [Pattern]
-    deriving (Show, Eq)
+    deriving (Show)
 
 data Statement = STypeDef TypeCons 
                | SLetRec  Ident Expr (Maybe Type) -- letrec binding expression to the identifier (with optional type annotation for polymorphic declarations)
                -- TODO: imports ? or have those just flatten down to statements
-               deriving (Show, Eq)
+               deriving (Show)
 
 type Program = [Statement] -- a program is a series of statements in no particular order
 
@@ -64,6 +69,10 @@ instance Show Expr where
     show (EApp fn arg) = "(" ++ show fn ++ " " ++ show arg ++ ")"
     show (ELit (LInt x)) = show x
     show (ECons id expr) = id ++ "#" ++ show expr
+    show (ECase inp pats) = "case[" ++ show inp ++ "]{"
+        ++ foldr (\(p, f) str -> 
+            str ++ (if null str then "" else ";") ++"\n\t" ++ show p 
+            ++ " |-> " ++ show f) "" pats ++ "\n}"
 
 instance Show Type where
     show (TVar v) = v
@@ -73,3 +82,22 @@ instance Show Type where
     show (TQuant cs body) = "forall" ++
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
     show (TCon id holes) = id ++ foldMap ((" "++). show) holes
+
+-- some data types defined here to avoid circular deps
+
+-- runad types, see CoreLang.Runad --
+
+-- a substitution map of variables to expressions
+type VarEnv = Map Ident Expr
+type DCLookup = Map Ident DataCons
+type EError = String
+
+-- for info that needs to be pushed down in execution
+data RunadSTIn = RunadSTIn VarEnv DCLookup Int 
+    deriving (Show)
+
+-- info that needs to come back up in execution
+data RunadSTOut = RunadSTOut Int
+    deriving (Show)
+
+newtype Runad a = Runad (RunadSTIn -> IO (Either EError a, RunadSTOut))
