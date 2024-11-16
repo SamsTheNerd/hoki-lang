@@ -1,0 +1,29 @@
+data List a = Cons a (List a) | Empty;
+
+let head = \l -> case l of
+    (Cons x _) -> x;
+
+let tail = \l -> case l of
+    (Cons _ xs) -> xs;
+
+let take = \n -> \l -> case n of
+    0 -> Empty;
+    _ -> case l of
+        Empty -> Empty;
+        (Cons x xs) -> (Cons x (take (intAdd n (intNeg 1)) xs))
+
+let last = \l -> case l of
+    (Cons x Empty) -> x;
+    (Cons x xs) -> (last xs);
+
+let repeat = \x -> (Cons x (repeat x))
+
+let foldr = \f -> \s -> \l -> case l of
+    Empty -> s;
+    (Cons x xs) -> (f x (foldr f s xs));
+
+let sum = \xs -> (foldr intAdd 0 xs)
+
+let iterate = \f -> \x -> (Cons x (iterate f (f x)))
+
+let main = sum (take 10 (iterate (intAdd 1) 0))

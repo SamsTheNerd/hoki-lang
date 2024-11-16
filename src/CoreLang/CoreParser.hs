@@ -1,9 +1,10 @@
+{-# LANGUAGE LambdaCase #-}
 module CoreLang.CoreParser where
 import Text.Parsec.String
 import CoreLang.CoreSorts
 import Text.Parsec.Error
 import Text.Parsec
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 
 -- mostly just to test core lang
 
@@ -50,7 +51,7 @@ eCaseP = do
         bSpaces1
         pat <- patternP; bSpaces
         string "->"; bSpaces
-        fun <- exprP; 
+        fun <- exprP;
         -- skipMany1 (char ';')
         optional $ char ';'
         return (pat, fun)
@@ -79,7 +80,7 @@ tArrowP = do
     spaces
     string "->"
     spaces
-    toT <- typeP 
+    toT <- typeP
     -- char ')'
     return $ TArrow fromT toT
     -- chainl1 typeP ( TArrow <$ string "->")
@@ -95,7 +96,7 @@ tQuantP = do
     TQuant ((,CAny)<$> tvars) <$> typeP
 
 tConP :: Parser Type
-tConP = do 
+tConP = do
     name <- identP
     args <- many (spaces >> typeP)
     return $ TCon name args
@@ -181,8 +182,8 @@ tlLetP :: Parser Statement
 tlLetP = do
     string "let"
     bSpaces
-    name <- identP 
-    bSpaces 
+    name <- identP
+    bSpaces
     annot <- (do
         string "::"
         spaces
@@ -193,19 +194,35 @@ tlLetP = do
     exp <- exprP
     return $ SLetRec name exp annot
 
+-- I don't want to build imports into the core language 
+-- but i do want to play with them for my testing, so they're going here :)
+-- (if you have circular deps, just don't do that :D )
+importP :: Parser FilePath
+importP = do
+    string "import "; spaces;
+    many1 (char '/' <|> char '.' <|> letter) -- ig?
 
-programP :: Parser Program
-programP = do 
+-- potentially needs to import stuffs
+programP :: Parser (Program, [FilePath])
+programP = do
     bSpaces
-    chainl ((:[]) <$> (
-        try tlLetP 
-        <|> (STypeDef <$> typeconsP))
-        <|> ([] <$ try (char '#' >> many (noneOf ['\n', '\r'])) ) -- comments!
-        <|> ([] <$ eof ) -- end!
-        ) ((<>) <$ try bSpaces1) []
+    chainl (((\x -> ([x], [])) <$> try tlLetP)
+        <|> ( (\x -> ([x], [])) . STypeDef <$> try typeconsP)
+        <|> ( (\x -> ([], [x])) <$> try importP)
+        <|> (([],[]) <$ try (char '#' >> many (noneOf ['\n', '\r'])) ) -- comments!
+        <|> (([],[]) <$ eof ) -- end!
+        ) ((<>) <$ try bSpaces1) ([], [])
+
 
 readProgramFile :: FilePath -> IO (Either ParseError Program)
-readProgramFile fn = parseFromFile programP fn
+readProgramFile fn = parseFromFile programP fn >>= (\case
+    (Left err) -> return $ Left err
+    (Right iop@(prog, imps)) -> fmrrp >>= \case 
+            (Left err') -> return $ Left err'
+            (Right prog') -> (return . Right) $ prog ++ concat prog'
+        where mrrp = mapM readProgramFile imps
+              fmrrp = sequence <$> mrrp
+    )
 
 -- breakable spacing
 
@@ -214,9 +231,9 @@ bSpaces_ = (char '#' >> many (noneOf ['\n', '\r']) $> ' ') -- comments!
     -- can have new endOfLines but they must be followed by an indent (TODO: only on scope change?)
     <|> try (endOfLine >> tab)
     <|> try (endOfLine >> (' ' <$ many1 space))
-    <|> tab 
+    <|> tab
     <|> space
-    
+
 
 bSpaces :: Parser ()
 bSpaces = skipMany bSpaces_

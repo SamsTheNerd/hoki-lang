@@ -1,3 +1,4 @@
+import ../resources/tests/core/lists.clc
 
 # let id = \x -> x
 
@@ -7,30 +8,5 @@
 
 # let basicCalc = ((intMul 4) (intNeg two))
 
-data List a = Cons a (List a) | Empty;
-
-let sum = \l -> case l of
-    Empty -> 0;
-    (Cons x xs) -> (intAdd x) (sum xs);
-
-let nums = (Cons 4 (Cons 3 (Cons 2 (Cons 1 Empty))))
-
-let head = \l -> case l of
-    (Cons x _) -> x;
-
-let tail = \l -> case l of
-    (Cons _ xs) -> xs;
-
-let take = \n -> \l -> case n of
-    0 -> Empty;
-    _ -> case l of
-        Empty -> Empty;
-        (Cons x xs) -> (Cons x (take (intAdd n (intNeg 1)) xs))
-
-let last = \l -> case l of
-    (Cons x Empty) -> x;
-    (Cons x xs) -> (last xs);
-
-let repeat = \x -> (Cons x (repeat x))
 
 let main = sum (take 5 (repeat 1))

@@ -1,0 +1,7 @@
+data Pair a b = Pair a b
+
+let fst = \t -> case t of
+    (Pair x _) -> x;
+
+let snd = \t -> case t of
+    (Pair _ y) -> y;
