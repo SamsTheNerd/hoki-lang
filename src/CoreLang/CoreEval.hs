@@ -1,11 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 module CoreLang.CoreEval where
 import Control.Monad.State
-import Data.Map ( empty, singleton, Map )
+import Data.Map ( empty, singleton, Map, toList )
 import CoreLang.CoreSorts
 import qualified Data.Maybe
 import CoreLang.Runad
 import Control.Monad.Trans.Maybe (MaybeT (..), mapMaybeT)
+import qualified Data.Bifunctor
 
 type Subst = Map Ident Expr -- subst maps for laziness
 
@@ -42,10 +43,9 @@ eval e1@(EApp func arg) = do
 eval e1@(ECase inp []) = runadErr $ "Non-exhaustive patterns in: " ++ show e1
 eval e1@(ECase inp ((p, pe):ps)) = do
     res <- runMaybeT $ patternMatch p inp
-    case res of 
-        (Just ve) -> extendVarEnv' ve (eval pe)
+    case res of
+        (Just ve) -> extendVarEnv' ve (eval (varSubs ve pe))
         Nothing -> eval (ECase inp ps)
-
 
 -- immediate substitution
 -- subst :: Expr -> Runad Expr
@@ -63,27 +63,35 @@ varSub v newExpr inExp@(EVar id) = if id == v then newExpr else inExp
 varSub v newExpr inExp@(ELambda arg body) = ELambda arg (varSub v newExpr body)
 varSub v newExpr inExp@(EApp func arg) = EApp (varSub v newExpr func) (varSub v newExpr arg)
 varSub v newExpr inExp@(ECons name es) = ECons name (map (varSub v newExpr) es)
+varSub v newExpr inExp@(ECase inp ps) = ECase (varSub v newExpr inp)
+    (map (Data.Bifunctor.second (varSub v newExpr)) ps)
 varSub v newExpr inExp = inExp
+
+varSubs :: VarEnv -> Expr -> Expr
+varSubs venv exp = foldr (uncurry varSub) exp (toList venv)
 
 -- checks if an expression matches a pattern, and if so returns the bindings
 -- TODO: error check on all the binds that no var is being double bound here?
 patternMatch :: Pattern -> Expr -> MaybeT Runad VarEnv
 patternMatch PAny _ = (MaybeT . return . Just) empty
--- patternMatch (PLit e1) e2 = if e1 == e2 then Just empty else Nothing -- come back to this if we work out equality
+patternMatch (PLit (ELit p1)) (ELit p2) = MaybeT . return $ if p1 == p2 then Just empty else Nothing
+patternMatch p@(PLit (ELit p1)) e = (lift . eval) e >>= patternMatch p
+patternMatch (PLit _) _ = MaybeT $ return Nothing -- come back to this if we work out better equality
 patternMatch (PVar v) expr =
     mapMaybeT (>>= \case
             -- if we find a dataconstructor then go do that
             (Just dc) -> runMaybeT $ patternMatch (PCons v []) expr
             -- otherwise just bind
-            Nothing -> (return . Just . singleton v) expr 
+            Nothing -> (return . Just . singleton v) expr
         ) (MaybeT $ lookupDC v)
-    
-patternMatch (PLabel v p) expr = singleton v expr <$ patternMatch p expr 
+
+patternMatch (PLabel v p) expr = singleton v expr <$ patternMatch p expr
 patternMatch (PCons id ps) expr = do
     expr' <- (lift . eval) expr -- need to check the expression so eval it
     case expr' of
-        (ECons dcid fields) -> if length fields /= length ps then MaybeT $ return Nothing 
+        (ECons dcid fields) -> if length fields /= length ps then MaybeT $ return Nothing
         else foldr (\(p, e) rmvenv -> do
             mvenv <- rmvenv
             (mvenv <>) <$> patternMatch p e
             ) ((MaybeT . return . Just) empty) (reverse $ zip ps fields)
+        _ -> MaybeT $ return Nothing
