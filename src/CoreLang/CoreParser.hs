@@ -197,6 +197,7 @@ tlLetP = do
 -- I don't want to build imports into the core language 
 -- but i do want to play with them for my testing, so they're going here :)
 -- (if you have circular deps, just don't do that :D )
+-- TODO: maybe make these like,, less absolute or something? issue for later
 importP :: Parser FilePath
 importP = do
     string "import "; spaces;
