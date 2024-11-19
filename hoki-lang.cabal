@@ -68,7 +68,9 @@ library
                      CoreLang.CoreParser,
                      CoreLang.PrimIntegers,
                      CoreLang.PrimLoader,
-                     CoreLang.Runad
+                     CoreLang.Runad,
+                     CoreLang.Typad,
+                     CoreLang.CoreTyping,
 
     -- Modules included in this library but not exported.
     -- other-modules:

@@ -1,5 +1,6 @@
 module CoreLang.CoreSorts where
 import Data.Map (Map)
+import Data.IORef (IORef)
 
 -- loosely based on Data.hs from ps7 to start with
 type Ident = String -- maybe want something More here?
@@ -19,7 +20,7 @@ data Type = TVar TVar
           | TNamed Ident -- can this be merged in with constructed types? probably not ?
           | TArrow Type Type
           | TQuant [(TVar, TConstraint)] Type
-          | TMetaVar Int
+          | TMetaVar MetaTVar
         --   | TCon TypeCons [Type] -- a constructed type - should generally be fully instantiated, so kind *, but may be instantiated with placeholder typevars. TBD how to handle it if/when we get to typeclasses
           | TCon Ident [Type] -- a constructed type - should generally be fully instantiated, so kind *, but may be instantiated with placeholder typevars. TBD how to handle it if/when we get to typeclasses
         deriving (Eq)
@@ -32,16 +33,24 @@ data DataCons = DataCons Ident [Type]-- a data constructor is made from a series
     deriving (Show, Eq)
 
 -- constraints for typing. consider these semi-internal for the time being
-data TConstraint = CExact Type 
+data TConstraint = CExact Type -- an exact type
                  | CAny 
                 --  | TClass -- typeclasses in the future?
                 deriving (Show, Eq)
+
+data MetaTVar = MetaTVar Int (IORef TConstraint) -- a meta variable used to build up found constraints
+    deriving (Eq)
 
 -- language primitives (would be nice to have a way to introduce new prims easily? TODO: decide how exactly to have this, have it be informed by Type constructors?)
 data Literal = LInt Int
              | LDouble Double
              | LChar Char
             deriving (Show, Eq)
+
+getLiteralType :: Literal -> Type
+getLiteralType (LInt _) = TNamed "PrimInt"
+getLiteralType (LDouble _) = TNamed "PrimDouble"
+getLiteralType (LChar _) = TNamed "PrimChar"
 
 -- currently this prevents Expressions from being equality check-able
 data PrimOp = PrimOp (Expr -> Runad Expr) -- will add more type checker bits here
@@ -76,12 +85,13 @@ instance Show Expr where
 
 instance Show Type where
     show (TVar v) = v
-    show (TArrow f t@(TArrow _ _)) = show f ++ " -> (" ++ show t ++ ")" 
+    show (TArrow f@(TArrow _ _) t) = "(" ++ show f ++ ") -> " ++ show t
     show (TArrow f t) = show f ++ " -> " ++ show t
-    show (TMetaVar i) = "meta@" ++ show i
+    show (TMetaVar (MetaTVar i ref)) = "meta@" ++ show i
     show (TQuant cs body) = "forall" ++
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
     show (TCon id holes) = id ++ foldMap ((" "++). show) holes
+    show (TNamed name) = name
 
 -- some data types defined here to avoid circular deps
 
