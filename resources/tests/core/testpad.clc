@@ -1,12 +1,5 @@
-import ../resources/tests/core/lists.clc
+data Maybe a = Just a | Nothing;
 
-# let id = \x -> x
+let scomb = (\x -> \y -> \z -> (x z) (y z))
 
-# let comp = \f -> \g -> \x -> (f (g x))
-
-# let two = 2
-
-# let basicCalc = ((intMul 4) (intNeg two))
-
-
-let main = sum (take 5 (repeat 1))
+let id = \x -> x

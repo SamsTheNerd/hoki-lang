@@ -3,6 +3,7 @@ import Data.Map (Map)
 import Data.IORef (IORef)
 import qualified Data.Map
 import Data.Maybe (fromMaybe)
+import Data.List (nub, (\\))
 
 -- loosely based on Data.hs from ps7 to start with
 type Ident = String -- maybe want something More here?
@@ -102,6 +103,25 @@ substType subs (TArrow frT toT) = TArrow (substType subs frT) (substType subs to
 substType subs (TQuant tvs body) = TQuant tvs $ substType (Data.Map.filterWithKey (\k v -> k `notElem` map fst tvs) subs) body
 substType subs (TCon tn ts) = TCon tn $ substType subs <$> ts
 substType subs ty = ty
+
+-- get the free variables in an expression (ofc no zonking here)
+getFreeVarsE :: Expr -> [Ident]
+getFreeVarsE (EVar vn) = [vn]
+getFreeVarsE (ELambda arg body) = getFreeVarsE body \\ [arg]
+getFreeVarsE (EApp func arg) = nub $ getFreeVarsE func ++ getFreeVarsE arg
+getFreeVarsE (ECons name es) = nub $ concatMap getFreeVarsE es
+-- this def needs better handling for knocking out pattern deps
+getFreeVarsE (ECase arg ps) = nub $ getFreeVarsE arg ++ concatMap (\(p, e) -> getFreeVarsE e \\ getBindersP p) ps
+getFreeVarsE (ELit _) = []
+getFreeVarsE (EPrimOp _) = []
+
+-- get the bound variables of a pattern
+getBindersP :: Pattern -> [Ident]
+getBindersP PAny = []
+getBindersP (PLit _) = []
+getBindersP (PLabel name inP) = name:getBindersP inP
+getBindersP (PVar name) = [name]
+getBindersP (PCons name ps) = nub $ concatMap getBindersP ps
 
 -- some data types defined here to avoid circular deps
 

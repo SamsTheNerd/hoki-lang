@@ -65,6 +65,8 @@ typeType (EApp fun arg) (TInfer mv) = do
     argTy <- inferType arg
     void $ unifyType fTy (TArrow argTy (TMetaVar mv))
 
+typeType e exp = typadErr $ "not yet implemented check/inference of " ++ show e
+
 -- need a better name for this, but it does instType and handles unwrapping Expected
 instType' :: Type -> TyExp -> Typad Type
 instType' ty (TCheck cty) = unifyType ty cty

@@ -67,7 +67,7 @@ library
                      CoreLang.CoreRepl,
                      CoreLang.CoreParser,
                      CoreLang.PrimIntegers,
-                     CoreLang.PrimLoader,
+                     CoreLang.CoreLoader,
                      CoreLang.Runad,
                      CoreLang.Typad,
                      CoreLang.CoreTyping,
