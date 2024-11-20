@@ -99,7 +99,7 @@ tConP :: Parser Type
 tConP = do
     name <- identP
     args <- many (spaces >> typeP)
-    return $ TCon name args
+    return $ if null args then TVar name else TCon name args
 
 typeButNotArrowP :: Parser Type
 typeButNotArrowP = try tQuantP <|> try tConP <|> try tVarP <|> wrapParens typeButNotArrowP

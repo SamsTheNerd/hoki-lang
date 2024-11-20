@@ -42,34 +42,35 @@ data TyExp = TCheck Type -- check against the given type
 typeType :: Expr -> TyExp -> Typad ()
 
 -- nothing fancy should be happening with literals, so just let unify handle it
-typeType (ELit lit) (TInfer mv) = 
-    void $ unifyType (TMetaVar mv) (getLiteralType lit)
-typeType (ELit lit) (TCheck ty) = 
-    void $ unifyType ty (getLiteralType lit)
+typeType (ELit lit) exp = void $ instType' (getLiteralType lit) exp
 
-typeType (EVar v) (TInfer mv) = do
-    vTy <- lookupVarTy v
-    -- TODO: instantiate vTy here?
-    void $ unifyType (TMetaVar mv) vTy
-typeType (EVar v) (TCheck ty) = do
-    vTy <- lookupVarTy v
-    -- TODO: instantiate vTy here? also can prob take better advantage of the Expected pattern here but let's play it by ear
-    void $ unifyType ty vTy
+typeType (EVar v) exp = void $ lookupVarTy v >>= flip instType' exp
 
 -- infer lambda type by making new meta vars for arg and body and inferring body type in terms of arg type.
 typeType (ELambda varg body) (TInfer mv) = do
     argMV <- newMetaTVar -- should this be a type var ? i don't think so ? idk
-    bodyMv <- extendVarEnvT varg (TMetaVar argMV) (inferType body) 
+    bodyMv <- extendVarEnvT varg (TMetaVar argMV) (inferType body)
     -- do we need to handle chaining(?) constraints? does zonking just handle that later? i think so maybe? 
     writeMetaTVar mv (CExact (TArrow (TMetaVar argMV) bodyMv))
 
 -- check lambda type by splitting given type into arg and result types and then checking body type in terms of arg type
 typeType (ELambda varg body) (TCheck ty) = do
+    -- (lift . putStrLn) $ "inferring type of lambda: " ++ show body
     (argTy, resTy) <- splitFun ty
     extendVarEnvT varg argTy (checkType body resTy)
 
-
 typeType (EApp fun arg) (TInfer mv) = do
+    -- (lift . putStrLn) $ "inferring type of applying " ++ show fun ++ " to " ++ show arg
     fTy <- inferType fun
     argTy <- inferType arg
     void $ unifyType fTy (TArrow argTy (TMetaVar mv))
+
+-- need a better name for this, but it does instType and handles unwrapping Expected
+instType' :: Type -> TyExp -> Typad Type
+instType' ty (TCheck cty) = unifyType ty cty
+instType' ty (TInfer mv) = do 
+    -- (lift . putStrLn) $ "instantiating type' " ++ show ty
+    tcon <- instType ty 
+    writeMetaTVar mv (CExact tcon)
+    -- (lift . putStrLn) $ "done instantiating type' " ++ show ty ++ "; got: " ++ show tcon
+    return $ TMetaVar mv

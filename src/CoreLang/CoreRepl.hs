@@ -2,7 +2,7 @@ module CoreLang.CoreRepl where
 import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets, withStateT)
 import CoreLang.CoreSorts
 import CoreLang.CoreParser (readProgramFile, parseExpr)
-import CoreLang.PrimLoader (evalProgram)
+import CoreLang.PrimLoader (evalProgram, inferInProgram)
 import Data.Bifunctor (Bifunctor(..))
 import Control.Monad (void)
 import System.Console.Haskeline
@@ -27,14 +27,13 @@ creplDispatch 'r' _ = do
     case errOrProg of
         (Left err) -> outputStrLn ("error: " ++ show err)
         (Right prog) -> lift $ put (fn, prog) >> liftIO (putStrLn $ "reloaded file: " ++ fn)
-creplDispatch 't' expr = creplInferType expr undefined
+creplDispatch 't' expr = lift (gets snd) >>= creplInferType expr 
     
 creplInferType :: String -> Program -> CReplad ()
 creplInferType inp prog = case parseExpr inp of
     (Left err) -> outputStrLn ("parse error: " ++ show err)
     (Right expr) -> do
-        fref <- liftIO $ newIORef 0 
-        res <- liftIO $ runTypad (inferTypeTL expr) (TypadST empty empty fref)
+        res <- liftIO $ inferInProgram prog expr
         -- res <- liftIO $ evalProgram prog expr
         case res of
             (Left err) -> outputStrLn ("error: " ++ err)

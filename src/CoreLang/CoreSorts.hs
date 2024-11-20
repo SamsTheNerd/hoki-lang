@@ -1,6 +1,8 @@
 module CoreLang.CoreSorts where
 import Data.Map (Map)
 import Data.IORef (IORef)
+import qualified Data.Map
+import Data.Maybe (fromMaybe)
 
 -- loosely based on Data.hs from ps7 to start with
 type Ident = String -- maybe want something More here?
@@ -92,6 +94,14 @@ instance Show Type where
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
     show (TCon id holes) = id ++ foldMap ((" "++). show) holes
     show (TNamed name) = name
+
+
+substType :: Map TVar Type -> Type -> Type
+substType subs ty@(TVar v) = fromMaybe ty (Data.Map.lookup v subs)
+substType subs (TArrow frT toT) = TArrow (substType subs frT) (substType subs toT)
+substType subs (TQuant tvs body) = TQuant tvs $ substType (Data.Map.filterWithKey (\k v -> k `notElem` map fst tvs) subs) body
+substType subs (TCon tn ts) = TCon tn $ substType subs <$> ts
+substType subs ty = ty
 
 -- some data types defined here to avoid circular deps
 
