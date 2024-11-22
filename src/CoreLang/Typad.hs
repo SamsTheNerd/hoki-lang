@@ -246,6 +246,7 @@ unifyType ty1 ty2@(TArrow frT2 toT2) = unifyType ty2 ty1 -- reuse symmetric
 unifyType ty1@(TCon tn1 ts1) ty2@(TCon tn2 ts2) = if tn1 /= tn2 || length ts1 /= length ts2 then typadErr $ "Could not unify types " ++ show ty1 ++ " with " ++ show ty2 else
     TCon tn1 <$> zipWithM unifyType ts1 ts2
 
+unifyType ty1@(TNamed n1) ty2@(TNamed n2) = if n1 == n2 then return ty1 else typadErr $ " Could not unify types " ++ show ty1 ++ " with " ++ show ty2
 
 unifyType ty1 ty2 = typadErr $ "Unhandled unification of types " ++ show ty1 ++ " and " ++ show ty2
 

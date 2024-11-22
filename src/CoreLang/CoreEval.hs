@@ -36,7 +36,7 @@ eval e1@(ECons _ _) = return e1 -- lazy?
 eval e1@(EApp func@(ELambda argId body) arg) = do -- prob need to alpha rename around here?
     -- refId <- gecrFresh argId
     extendVarEnv argId arg (eval (varSub argId arg body))
-eval e1@(EApp func@(EPrimOp (PrimOp pop)) arg) = pop arg
+eval e1@(EApp func@(EPrimOp (PrimOp pop _)) arg) = pop arg
 eval e1@(EApp func arg) = do
     eF <- eval func
     eval (EApp eF arg)

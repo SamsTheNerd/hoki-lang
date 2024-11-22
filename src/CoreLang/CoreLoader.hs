@@ -14,12 +14,20 @@ import Control.Monad (foldM)
 -- gathering primitve groups
 
 -- the loaded program
-data LProg = LProg VarTyEnv TConsLookup DCLookup VarEnv -- TODO: should this like,, be a data type?
+data LProg = LProg VarTyEnv TConsLookup DCLookup VarEnv
 
-emptyLProg :: LProg
-emptyLProg = LProg empty empty empty empty
+emptyLProg_ :: LProg
+emptyLProg_ = LProg empty empty empty empty
 
+-- TODO: this is disgusting
+coreProg :: IO LProg
+coreProg = do
+    errOrProg <- loadProgram (loadPrimOps [])
+    case errOrProg of
+        (Left err) -> putStrLn ("MAJOR ERROR: PRIMITIVES ARE BROKEN: " ++ err) >> return undefined
+        (Right lprog) -> return lprog
 
+-- TODO: maybe have a better structure for primops if this gets cumbersome
 primGroups :: [[(String, Expr)]]
 primGroups = [
     primIntOps
@@ -27,6 +35,10 @@ primGroups = [
 
 allPrimOps :: [(String, Expr)]
 allPrimOps = concat primGroups
+
+-- TODO: figure out if we want to annotate these primops? idk
+loadPrimOps :: Program -> Program
+loadPrimOps prog = prog ++ map (\(name, expr) -> SLetRec name expr Nothing) allPrimOps
 
 -- var env here is to carry expressions out so that we can type check them
 loadStatement :: Statement -> LProg -> LProg
@@ -36,7 +48,7 @@ loadStatement (SLetRec vid bexp mAnnot) (LProg vtenv tcl dcl venv) = LProg
     $ insert vid bexp venv
 loadStatement (STypeDef tcon@(TypeCons name _ dcs)) (LProg vtenv tcl dcl venv) = foldr (
     \dc@(DataCons did _) (LProg vtenv' tcl' dcl' venv') ->
-        LProg (insert did (typeDCLambda tcon dc) vtenv') tcl' (insert did dc dcl') (insert did (mkDCLambda dc)venv')
+        LProg (insert did (typeDCLambda tcon dc) vtenv') tcl' (insert did dc dcl') (insert did (mkDCLambda dc) venv')
     )
     (LProg vtenv (insert name tcon tcl) dcl venv) dcs
 
@@ -64,7 +76,7 @@ inferInProgram prog expr = do
 
 -- loads and types checks the given program or throws an error
 loadProgram :: Program -> IO (Either TError LProg)
-loadProgram prog = staticCheck $ foldr loadStatement emptyLProg prog
+loadProgram prog = staticCheck $ foldr loadStatement emptyLProg_ (loadPrimOps prog)
 
 ----------------------------------------
 --     Initial Type Checking Pass     --
@@ -75,7 +87,7 @@ staticCheck :: LProg -> IO (Either TError LProg)
 staticCheck lprog@(LProg _ _ _ venv) = foldM (\case
     (Right val) -> (checkDepSCC val)
     err -> const $ return err) (Right lprog) deps
-    where deps = orderDeps venv 
+    where deps = orderDeps venv
 
 -- checking that a single scc is fine
 checkDepSCC :: LProg -> [Ident] -> IO (Either TError LProg)
@@ -85,7 +97,7 @@ checkDepSCC lprog@(LProg vtenv tcl dcl venv) [dp] = case (Data.Map.lookup dp vte
     -- has an annotation so typecheck
     (Just ty, Just ve) -> return . Right $ lprog -- TODO: actually check stuff here
     -- no annotation so infer one
-    (Nothing, Just ve) -> do 
+    (Nothing, Just ve) -> do
         fref <- newIORef 0
         runTypad (inferTypeTL ve) (TypadST vtenv tcl dcl fref) >>= \case
             (Left err) -> return . Left $ err

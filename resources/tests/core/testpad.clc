@@ -3,3 +3,9 @@ data Maybe a = Just a | Nothing;
 let scomb = (\x -> \y -> \z -> (x z) (y z))
 
 let id = \x -> x
+
+let mul2 = (intMul 2)
+
+let fcomp = \f -> \g -> \x -> (f (g x))
+
+let numtest = fcomp (intAdd (intNeg 10)) (intMul 3) 4

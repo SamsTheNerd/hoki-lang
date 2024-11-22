@@ -21,16 +21,16 @@ getAsInt exp = do
         -- ^^^ THIS SHOULD NEVER HAPPEN IF TYPE CHECKER IS WORKING --
 
 partialIntAdd :: Int -> PrimOp
-partialIntAdd n = PrimOp $ fmap (ELit . LInt . (n +)) . getAsInt
+partialIntAdd n = PrimOp (fmap (ELit . LInt . (n +)) . getAsInt) (TArrow primIntT primIntT)
 
 intAdd :: PrimOp
-intAdd = PrimOp $ fmap (EPrimOp . partialIntAdd) . getAsInt
+intAdd = PrimOp (fmap (EPrimOp . partialIntAdd) . getAsInt) (TArrow primIntT (TArrow primIntT primIntT))
 
 partialIntMul :: Int -> PrimOp
-partialIntMul n = PrimOp $ fmap (ELit . LInt . (n *)) . getAsInt
+partialIntMul n = PrimOp (fmap (ELit . LInt . (n *)) . getAsInt) (TArrow primIntT primIntT)
 
 intMul :: PrimOp
-intMul = PrimOp $ fmap (EPrimOp . partialIntMul) . getAsInt
+intMul = PrimOp (fmap (EPrimOp . partialIntMul) . getAsInt) (TArrow primIntT (TArrow primIntT primIntT))
 
 intNeg :: PrimOp
-intNeg = PrimOp $ fmap (ELit . LInt . negate) . getAsInt
+intNeg = PrimOp (fmap (ELit . LInt . negate) . getAsInt) (TArrow primIntT primIntT)

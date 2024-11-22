@@ -50,13 +50,23 @@ data Literal = LInt Int
              | LChar Char
             deriving (Show, Eq)
 
+
+primIntT :: Type
+primIntT = TNamed "PrimInt"
+
+primDoubleT :: Type
+primDoubleT = TNamed "PrimDouble"
+
+primCharT :: Type
+primCharT = TNamed "PrimChar"
+
 getLiteralType :: Literal -> Type
-getLiteralType (LInt _) = TNamed "PrimInt"
-getLiteralType (LDouble _) = TNamed "PrimDouble"
-getLiteralType (LChar _) = TNamed "PrimChar"
+getLiteralType (LInt _) = primIntT
+getLiteralType (LDouble _) = primDoubleT
+getLiteralType (LChar _) = primCharT
 
 -- currently this prevents Expressions from being equality check-able
-data PrimOp = PrimOp (Expr -> Runad Expr) -- will add more type checker bits here
+data PrimOp = PrimOp (Expr -> Runad Expr) Type -- will add more type checker bits here.
 
 -- a pattern that tries to match an expression 
 data Pattern = PLit Expr -- match for equality ? idk if we can actually support that reliably
@@ -85,6 +95,9 @@ instance Show Expr where
         ++ foldr (\(p, f) str -> 
             str ++ (if null str then "" else ";") ++"\n\t" ++ show p 
             ++ " |-> " ++ show f) "" pats ++ "\n}"
+    show (EPrimOp (PrimOp _ ty)) = "primOp(" ++ show ty ++ ")"
+    show (ELit (LDouble x)) = show x
+    show (ELit (LChar x)) = show x
 
 instance Show Type where
     show (TVar v) = v
