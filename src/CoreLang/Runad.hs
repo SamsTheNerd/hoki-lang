@@ -82,7 +82,7 @@ lookupDC :: Ident -> Runad (Maybe (DataCons, TypeCons))
 lookupDC v = do
     (RunadSTIn _ dcl _) <- getRST
     return $ Data.Map.lookup v dcl
-
+    
 lookupVar' :: Ident -> Runad Expr
 lookupVar' v = do
     (RunadSTIn env _ _) <- getRST

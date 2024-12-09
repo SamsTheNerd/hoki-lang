@@ -6,7 +6,7 @@ import Data.Map (insert, fromList, empty, lookup, toList, singleton, union, keys
 import CoreLang.Runad
 import CoreLang.CoreEval (eval)
 import CoreLang.Typad (TConsLookup, VarTyEnv, TError, runTypad, TypadST (TypadST))
-import CoreLang.CoreTyping (inferTypeTL)
+import CoreLang.CoreTyping (inferTypeTL, inferTypeTLRec)
 import Data.IORef (newIORef)
 import Data.Graph (graphFromEdges, scc)
 import Control.Monad (foldM)
@@ -113,15 +113,16 @@ checkDepSCC lprog@(LProg vtenv tcl dcl venv) [dp] = do
     let ty = fromMaybe undefined $ Data.Map.lookup dp vtenv
     -- get type env with inferred type in there
     vtenvE <- case ty of
-            (TMetaVar _) -> do
+            mty@(TMetaVar _) -> do
+                putStrLn $ "\nstarting type inference for: " ++ show dp
                 fref <- newIORef 0
                 (\case
                     (Left err) -> Left err
                     (Right infTy) -> Right $ Data.Map.insert dp infTy vtenv
-                    ) <$> runTypad (inferTypeTL expr) (TypadST vtenv tcl dcl fref) 
+                    ) <$> runTypad (inferTypeTLRec expr mty) (TypadST vtenv tcl dcl fref) 
             (ty') -> return . Right $ vtenv -- TODO: do checking here
     return $ (\vtenv' -> LProg vtenv' tcl dcl venv ) <$> vtenvE
-    
+
 checkDepSCC (LProg vtenv tcl dcl venv) dps = return . Left $ "circular dependencies not yet handled"
 
 

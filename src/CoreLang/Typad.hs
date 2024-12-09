@@ -87,10 +87,11 @@ writeMetaTVar :: MetaTVar -> TConstraint -> Typad ()
 writeMetaTVar mv@(MetaTVar _ ref) tcon = do 
     zcon <- zonkConstraint tcon
     lift $ writeIORef ref zcon; 
-    -- lift $ putStrLn ("writing " ++ show mv ++ " as: " ++ show tcon)
-writeMetaTVar (MetaStrVar _ ref) tcon = do
+    -- lift $ putStrLn ("writing " ++ show mv ++ " as: " ++ show tcon ++ " \t(z=>)\t " ++ show zcon)
+writeMetaTVar mv@(MetaStrVar _ ref) tcon = do
     zcon <- zonkConstraint tcon
     lift $ writeIORef ref zcon
+    -- lift $ putStrLn ("writing " ++ show mv ++ " as: " ++ show tcon ++ " \t(z=>)\t " ++ show zcon)
 
 -- newTypeVar :: Typad Type
 -- -- newTypeVar = TVar . ("tv" ++) . show <$> getFreshName
@@ -281,8 +282,9 @@ unifyType ty1@(TArrow frT1 toT1) ty2 = do
     -- plzSlowDown frT1
     -- (lift . putStrLn) $ "unifying functions " ++ show ty1 ++ " & " ++ show ty2
     (frT2, toT2) <- splitFun ty2
-    unifyType frT1 frT2
-    unifyType toT1 toT2
+    frTU <- unifyType frT1 frT2
+    toTU <- unifyType toT1 toT2
+    return $ TArrow frTU toTU
 
 unifyType ty1 ty2@(TArrow frT2 toT2) = unifyType ty2 ty1 -- reuse symmetric 
 

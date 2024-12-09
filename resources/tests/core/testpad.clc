@@ -17,4 +17,6 @@ let nothingTest = Nothing
 let testCases = \x -> case x of
     (Just y) -> y
 
-let recTest = \x -> recTest x
+let recTest = \x -> (recTest x)
+
+let boop = (\b -> boop)

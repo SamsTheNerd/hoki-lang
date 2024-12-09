@@ -1,7 +1,7 @@
 module CoreLang.CoreTyping where
 import CoreLang.CoreSorts
 import CoreLang.Typad
-import Control.Monad ( void, when, zipWithM, zipWithM_ )
+import Control.Monad ( void, when, zipWithM, zipWithM_, foldM, foldM_ )
 import Data.Map hiding (foldr, map)
 
 ---- Sam's ramblings, feel free to ignore :)
@@ -17,11 +17,26 @@ import Data.Map hiding (foldr, map)
 
 -- this code also borrows heavily from the design given in the paper linked in Typad.hs
 
+-- infers a type at the top level 
 inferTypeTL :: Expr -> Typad Type
 inferTypeTL expr = do
+    mv <- TMetaVar <$> newMetaTVar
+    inferTypeTLRec expr mv
+
+-- infers a type at the top level and unifies with given type (used for let recs)
+inferTypeTLRec :: Expr -> Type -> Typad Type
+inferTypeTLRec expr aty = do
     ty <- inferType expr
+    -- lift . putStrLn $ "ty: " ++ show ty
     zty <- zonkType ty
-    quantifyType zty
+    -- lift . putStrLn $ "zty: " ++ show zty
+    zaty <- zonkType aty
+    -- lift . putStrLn $ "zaty: " ++ show zaty
+    uty <- unifyType zaty zty
+    -- lift . putStrLn $ "uty: " ++ show uty
+    zuty <- zonkType uty
+    -- lift . putStrLn $ "zuty: " ++ show zuty
+    quantifyType zuty
 
 -- the bidirectional higher rank paper distinguishes between rho and sigma forms of its typing functions. We'll do that to an extent here but we don't need to consider it *as much* since we're not dealing with higher rank. really just quantifying on tl and making sure to instantiate variable bindings.
 
@@ -91,6 +106,12 @@ typeType (ECase expr cases) expd = do
     -- we don't care about result as much as we care about filling in holes
     let caseBinds = zipWith (\pb cas -> (snd pb, snd cas)) patBinds cases
     mapM_ (\(subst, body) -> extendVarEnvTs subst (typeType body expd)) caseBinds
+    -- case expd of
+    --     (TInfer mv) -> do 
+    --         bTys <- mapM (\(subst, body) -> extendVarEnvTs subst (inferType body)) caseBinds
+    --         foldM_ unifyType (TMetaVar mv) bTys
+    --     (TCheck chTy) -> do
+    --         mapM_ (\(subst, body) -> extendVarEnvTs subst (checkType body chTy)) caseBinds
 
 typeType e exp = typadErr $ "not yet implemented check/inference of " ++ show e
 
@@ -110,7 +131,7 @@ bindPats (PCons dcId pats) = do
     let fullSubst = foldr (\x acc -> snd x <> acc) empty inrBinds -- combine their subst maps
     let inrTys = map fst inrBinds -- grab the tl types out
     tc <- unifyCons dcId inrTys
-    return (tc, fullSubst) -- construct a dummy cons type that represents this pattern. TODO: THIS IS WRONG. NEED A WAY TO UNIFY DC & TC
+    return (tc, fullSubst) -- construct a dummy cons type that represents this pattern.
 bindPats (PLit expr) = do
     ty <- inferType expr
     return (ty, empty)
