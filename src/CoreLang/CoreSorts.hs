@@ -104,13 +104,21 @@ instance Show Type where
     show (TVar v) = v
     show (TArrow f@(TArrow _ _) t) = "(" ++ show f ++ ") -> " ++ show t
     show (TArrow f t) = show f ++ " -> " ++ show t
-    show (TMetaVar (MetaTVar i ref)) = "meta@" ++ show i
-    show (TMetaVar (MetaStrVar str ref)) = "meta@" ++ show str
+    show (TMetaVar mv) = show mv
     show (TQuant cs body) = "forall" ++
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
     show (TCon id holes) = id ++ foldMap ((" "++). show) holes
     show (TNamed name) = name
 
+instance Show MetaTVar where
+    show (MetaTVar i _) = "meta@" ++ show i
+    show (MetaStrVar str _) = "meta@" ++ show str
+
+instance Ord MetaTVar where
+    (MetaTVar i _ ) <= (MetaTVar j _) = i <= j
+    (MetaStrVar str1 _ ) <= (MetaStrVar str2 _) = str1 <= str2
+    (MetaTVar _ _ ) <= (MetaStrVar _ _) = True
+    (MetaStrVar _ _ ) <= (MetaTVar _ _) = False
 
 substType :: Map TVar Type -> Type -> Type
 substType subs ty@(TVar v) = fromMaybe ty (Data.Map.lookup v subs)
@@ -118,6 +126,14 @@ substType subs (TArrow frT toT) = TArrow (substType subs frT) (substType subs to
 substType subs (TQuant tvs body) = TQuant tvs $ substType (Data.Map.filterWithKey (\k v -> k `notElem` map fst tvs) subs) body
 substType subs (TCon tn ts) = TCon tn $ substType subs <$> ts
 substType subs ty = ty
+
+-- replace the metavars with their given types
+substMVs :: Map MetaTVar Type -> Type -> Type
+substMVs subs ty@(TMetaVar mv) = fromMaybe ty (Data.Map.lookup mv subs)
+substMVs subs (TArrow frT toT) = TArrow (substMVs subs frT) (substMVs subs toT)
+substMVs subs (TQuant tvs body) = TQuant tvs (substMVs subs body)
+substMVs subs (TCon tn ts) = TCon tn $ substMVs subs <$> ts
+substMVs _ ty = ty
 
 -- get the free variables in an expression (ofc no zonking here)
 getFreeVarsE :: Expr -> [Ident]

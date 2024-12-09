@@ -84,9 +84,13 @@ readMetaTVar (MetaTVar _ ref) = lift $ readIORef ref
 readMetaTVar (MetaStrVar _ ref) = lift $ readIORef ref
 
 writeMetaTVar :: MetaTVar -> TConstraint -> Typad ()
-writeMetaTVar (MetaTVar _ ref) tcon = lift $ writeIORef ref tcon
-writeMetaTVar (MetaStrVar _ ref) tcon = lift $ writeIORef ref tcon
-
+writeMetaTVar mv@(MetaTVar _ ref) tcon = do 
+    zcon <- zonkConstraint tcon
+    lift $ writeIORef ref zcon; 
+    -- lift $ putStrLn ("writing " ++ show mv ++ " as: " ++ show tcon)
+writeMetaTVar (MetaStrVar _ ref) tcon = do
+    zcon <- zonkConstraint tcon
+    lift $ writeIORef ref zcon
 
 -- newTypeVar :: Typad Type
 -- -- newTypeVar = TVar . ("tv" ++) . show <$> getFreshName
@@ -137,14 +141,27 @@ zonkType' _ ty@(TNamed _) = return ty
 zonkType' seen ty@(TArrow frT toT) = do
     zfrT <- zonkType' seen frT
     ztoT <- zonkType' seen toT
+    -- lift . putStrLn . show $ TArrow zfrT ztoT
     return $ TArrow zfrT ztoT
-zonkType' seen ty@(TQuant tvs body) = TQuant tvs <$> zonkType' seen body
-zonkType' seen ty@(TMetaVar mv) = if mv `elem` seen then  typadErr "circular typing" else do
+zonkType' seen ty@(TQuant tvs body) = do 
+    mrrp <- TQuant tvs <$> zonkType' seen body
+    -- lift . putStrLn . show $ mrrp
+    return mrrp
+zonkType' seen ty@(TMetaVar mv) = if mv `elem` seen then  typadErr ("circular typing: " ++ show mv ++ " already seen") else do
     cons <- readMetaTVar mv
     case cons of
         CAny -> return ty
-        (CExact ty') -> zonkType' (mv:seen) ty'
-zonkType' seen ty@(TCon cn tys) = TCon cn <$> mapM (zonkType' seen) tys
+        (CExact ty') -> do 
+            -- lift . putStrLn . show $ ty'
+            zonkType' (mv:seen) ty'
+zonkType' seen ty@(TCon cn tys) = do
+    mrrp <- TCon cn <$> mapM (zonkType' seen) tys
+    -- lift . putStrLn . show $ mrrp
+    return mrrp
+
+zonkConstraint :: TConstraint -> Typad TConstraint
+zonkConstraint CAny = return CAny
+zonkConstraint (CExact ty) = CExact <$> zonkType ty
 
 occursIn :: MetaTVar -> Type -> Bool
 occursIn mv (TMetaVar mv') = mv == mv'
@@ -197,7 +214,15 @@ instType ty = do
     tmap <- fromList <$> mapM (\fv -> (fv,) . TMetaVar <$> newMetaTVar) fvs
     return $ substType tmap ty
 
--- occursCheck 
+-- takes a type and knocks out its metavars for quantified tvars
+quantifyType :: Type -> Typad Type
+quantifyType ty = do
+    mvs <- getMetaVars ty
+    let tvs = zipWith (\i _ -> "t" ++ show i) [1..] mvs
+    let mvSubst = zipWith (\mv tv -> (mv, TVar tv)) mvs tvs
+    let tvars = map ((, CAny)) tvs
+    let bodyTy = substMVs (fromList mvSubst) ty
+    return $ TQuant tvars bodyTy
 
 ------------------------------------------------------------------------------
 --              Unification
@@ -227,6 +252,10 @@ unifyType ty1@(TMetaVar mv1) ty2@(TMetaVar mv2) = if mv1 == mv2 then return ty1 
         _ -> do
             unicon <- unifyConstraints mcon1 mcon2 -- if they can't be unified then we get an error that bubbles up through Typad
             -- otherwise write the new unified constraint back to both metavars
+            -- lift $ putStrLn ("unifying mvs: " ++ show mv1 ++ " & " ++ show mv2 ++ ": " ++ show unicon)
+            -- case unicon of
+            --     (CExact tmv@(TMetaVar _)) -> return tmv
+            --     _ -> do
             writeMetaTVar mv1 unicon
             writeMetaTVar mv2 unicon
             return ty1

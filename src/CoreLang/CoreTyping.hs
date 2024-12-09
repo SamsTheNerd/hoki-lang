@@ -1,7 +1,7 @@
 module CoreLang.CoreTyping where
 import CoreLang.CoreSorts
 import CoreLang.Typad
-import Control.Monad ( void, when )
+import Control.Monad ( void, when, zipWithM, zipWithM_ )
 import Data.Map hiding (foldr, map)
 
 ---- Sam's ramblings, feel free to ignore :)
@@ -20,7 +20,8 @@ import Data.Map hiding (foldr, map)
 inferTypeTL :: Expr -> Typad Type
 inferTypeTL expr = do
     ty <- inferType expr
-    zonkType ty
+    zty <- zonkType ty
+    quantifyType zty
 
 -- the bidirectional higher rank paper distinguishes between rho and sigma forms of its typing functions. We'll do that to an extent here but we don't need to consider it *as much* since we're not dealing with higher rank. really just quantifying on tl and making sure to instantiate variable bindings.
 
@@ -82,7 +83,7 @@ typeType (EApp fun arg) (TInfer mv) = do
 
 --     -- zipWith unifyType
 --     return undefined
-    
+
 typeType (ECase expr cases) expd = do
     exprTy <- inferType expr -- infer our argument
     patBinds <- mapM (bindPats . fst) cases -- infer types of patterns, or atleast their shape
@@ -98,7 +99,7 @@ typeType e exp = typadErr $ "not yet implemented check/inference of " ++ show e
 -- but gives us a type structure to work with
 bindPats :: Pattern -> Typad (Type, Map Ident Type)
 bindPats (PAny) = do mv <- newMetaTVar; return (TMetaVar mv, empty)
-bindPats (PVar vid) = do 
+bindPats (PVar vid) = do
     mv <- newMetaTVar; let tMv = TMetaVar mv;
     return (tMv, fromList [(vid, tMv)])
 bindPats (PLabel lbl inrPat) = do
@@ -106,20 +107,34 @@ bindPats (PLabel lbl inrPat) = do
     return (inrTy, insert lbl inrTy inrSubst)
 bindPats (PCons dcId pats) = do
     inrBinds <- mapM bindPats pats -- bind the inner patterns
-    (_, TypeCons tcId _ _) <- lookupDC dcId
     let fullSubst = foldr (\x acc -> snd x <> acc) empty inrBinds -- combine their subst maps
     let inrTys = map fst inrBinds -- grab the tl types out
-    return (TCon tcId inrTys, fullSubst) -- construct a dummy cons type that represents this pattern.
+    tc <- unifyCons dcId inrTys
+    return (tc, fullSubst) -- construct a dummy cons type that represents this pattern. TODO: THIS IS WRONG. NEED A WAY TO UNIFY DC & TC
 bindPats (PLit expr) = do
     ty <- inferType expr
     return (ty, empty)
 
+-- get the type (tcon) of an abstract constructed data
+-- ex: Just Int would give List Int
+-- ex: unifyCons "ListCons" [Int, List Int] == List Int
+unifyCons :: Ident -> [Type] -> Typad Type
+unifyCons dcId instArgs = do
+    (dc@(DataCons _ dcArgs), tc@(TypeCons tcId tvs _)) <- lookupDC dcId
+    -- tcTy <- instType $ TCon tcId (TVar <$> tvs) -- a placeholder filled instance of this constructed type.
+    -- subst <- fromList <$> mapM (\tv -> (\mv -> (tv, TMetaVar mv)) <$> newMetaTVar) tvs
+    mvs <- mapM (const $ TMetaVar <$> newMetaTVar) tvs -- a meta var for each type cons tvar
+    let subst = fromList $ zip tvs mvs
+    let sArgs = map (substType subst) dcArgs -- replace tvars with placeholders in arg types
+    zipWithM_ unifyType instArgs sArgs -- unify instance args with general args
+    return $ TCon tcId mvs
+
 -- need a better name for this, but it does instType and handles unwrapping Expected
 instType' :: Type -> TyExp -> Typad Type
 instType' ty (TCheck cty) = unifyType ty cty
-instType' ty (TInfer mv) = do 
+instType' ty (TInfer mv) = do
     -- (lift . putStrLn) $ "instantiating type' " ++ show ty
-    tcon <- instType ty 
+    tcon <- instType ty
     writeMetaTVar mv (CExact tcon)
     -- (lift . putStrLn) $ "done instantiating type' " ++ show ty ++ "; got: " ++ show tcon
     return $ TMetaVar mv
