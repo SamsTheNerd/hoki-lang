@@ -142,7 +142,7 @@ getBindersP (PCons name ps) = nub $ concatMap getBindersP ps
 
 -- a substitution map of variables to expressions
 type VarEnv = Map Ident Expr
-type DCLookup = Map Ident DataCons
+type DCLookup = Map Ident (DataCons, TypeCons)
 type EError = String
 
 -- for info that needs to be pushed down in execution

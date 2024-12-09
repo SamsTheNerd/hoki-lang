@@ -110,6 +110,20 @@ extendVarEnvT :: Ident -> Type -> Typad a -> Typad a
 extendVarEnvT vid ty inad = Typad $ \st@(TypadST venv tcl dcl fref) ->
     runTypad inad (TypadST (insert vid ty venv) tcl dcl fref)
 
+extendVarEnvTs :: Map Ident Type -> Typad a -> Typad a
+extendVarEnvTs subst inad = Typad $ \(TypadST venv tcl dcl fref) ->
+    runTypad inad (TypadST (subst <> venv) tcl dcl fref)
+
+lookupDC :: Ident -> Typad (DataCons, TypeCons)
+lookupDC dcid = Typad $ \(TypadST _ _ dcl _) -> return $ case Data.Map.lookup dcid dcl of
+    (Just ty) -> Right ty
+    _         -> Left $ "Unknown type constructor: " ++ dcid
+
+lookupTCon :: Ident -> Typad TypeCons
+lookupTCon tid = Typad $ \(TypadST _ tcl _ _) -> return $ case Data.Map.lookup tid tcl of
+    (Just ty) -> Right ty
+    _         -> Left $ "Unknown type constructor: " ++ tid
+
 -- knocks out exactly typed constraints (and should prob do something with other constraints but not my issue rn because they don't exist !!)
 zonkType :: Type -> Typad Type
 zonkType = zonkType' []

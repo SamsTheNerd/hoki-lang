@@ -8,4 +8,13 @@ let mul2 = (intMul 2)
 
 let fcomp = \f -> \g -> \x -> (f (g x))
 
-let numtest = fcomp (intAdd (intNeg 10)) (intMul 3) 4
+let numtest = (fcomp (intAdd (intNeg 10)) (intMul 3) 4)
+
+let maybeTest = (Just 2)
+
+let nothingTest = Nothing
+
+let testCases = \x -> case x of
+    (Just y) -> y
+
+let recTest = \x -> recTest x

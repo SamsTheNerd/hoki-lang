@@ -78,7 +78,7 @@ lookupVar v = do
     (RunadSTIn env _ _) <- getRST
     return $ Data.Map.lookup v env
 
-lookupDC :: Ident -> Runad (Maybe DataCons)
+lookupDC :: Ident -> Runad (Maybe (DataCons, TypeCons))
 lookupDC v = do
     (RunadSTIn _ dcl _) <- getRST
     return $ Data.Map.lookup v dcl
