@@ -53,7 +53,7 @@ creplInferType expr = creplAct ((\case
 creplEval :: String -> CReplad ()
 creplEval expr = creplAct ((\case
             (Left err) -> ("error: " ++ err)
-            (Right resVal) -> show expr ++ " :: " ++ show resVal)
+            (Right resVal) -> show resVal)
         <$:> evalProgram) expr
 
 (<$:>) :: Monad m => (c -> d) -> (a -> b -> m c) -> a -> b -> m d
@@ -77,7 +77,7 @@ creplLoop = do
         "" -> return ()
         _ ->  creplAct ((\case
             (Left err) -> ("error: " ++ err)
-            (Right resVal) -> show inp ++ " :: " ++ show resVal)
+            (Right resVal) -> show resVal)
             <$:> evalProgram) inp
     creplLoop
 

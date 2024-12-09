@@ -126,6 +126,9 @@ lookupDC dcid = Typad $ \(TypadST _ _ dcl _) -> return $ case Data.Map.lookup dc
     (Just ty) -> Right ty
     _         -> Left $ "Unknown type constructor: " ++ dcid
 
+lookupDC' :: Ident -> Typad (Maybe (DataCons, TypeCons))
+lookupDC' dcid = Typad $ \(TypadST _ _ dcl _) -> return . Right $ Data.Map.lookup dcid dcl
+
 lookupTCon :: Ident -> Typad TypeCons
 lookupTCon tid = Typad $ \(TypadST _ tcl _ _) -> return $ case Data.Map.lookup tid tcl of
     (Just ty) -> Right ty
@@ -197,7 +200,7 @@ getMetaVars ty@(TNamed _) = return []
 getMetaVars ty@(TArrow frT toT) = do
     frTfvs <- getMetaVars frT
     toTfvs <- getMetaVars toT
-    (return . nub . (++ frTfvs)) toTfvs
+    (return . nub . (++ toTfvs)) frTfvs
 getMetaVars ty@(TMetaVar mv) = do
     res <- readMetaTVar mv
     case res of
@@ -266,10 +269,11 @@ unifyType ty1@(TMetaVar mv1) ty2 = do
     -- (lift . putStrLn) $ "unifying 1 metavar with type: " ++ show ty1 ++ " & " ++ show ty2
     mcon1 <- readMetaTVar mv1
     -- check for circular issues
+    zty2 <- zonkType ty2
     case mcon1 of
         CAny -> do
             mvOccurs <- elem mv1 <$> getMetaVars ty2
-            Control.Monad.when mvOccurs $ typadErr $ "cannot unify " ++ show (TMetaVar mv1) ++ " with " ++ show ty2
+            Control.Monad.when mvOccurs $ typadErr $ "cannot unify " ++ show (TMetaVar mv1) ++ " with " ++ show zty2
         _ -> return ()
     unicon <- unifyConstraints mcon1 (CExact ty2)
     writeMetaTVar mv1 unicon

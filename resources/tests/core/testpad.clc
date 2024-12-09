@@ -1,5 +1,7 @@
 data Maybe a = Just a | Nothing;
 
+data Either a b = Left a | Right b | Both (a) (b);
+
 let scomb = (\x -> \y -> \z -> (x z) (y z))
 
 let id = \x -> x
@@ -19,4 +21,3 @@ let testCases = \x -> case x of
 
 let recTest = \x -> (recTest x)
 
-let boop = (\b -> boop)

@@ -114,7 +114,7 @@ checkDepSCC lprog@(LProg vtenv tcl dcl venv) [dp] = do
     -- get type env with inferred type in there
     vtenvE <- case ty of
             mty@(TMetaVar _) -> do
-                putStrLn $ "\nstarting type inference for: " ++ show dp
+                -- putStrLn $ "\nstarting type inference for: " ++ show dp
                 fref <- newIORef 0
                 (\case
                     (Left err) -> Left err

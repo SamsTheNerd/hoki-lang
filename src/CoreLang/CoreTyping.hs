@@ -121,8 +121,12 @@ typeType e exp = typadErr $ "not yet implemented check/inference of " ++ show e
 bindPats :: Pattern -> Typad (Type, Map Ident Type)
 bindPats (PAny) = do mv <- newMetaTVar; return (TMetaVar mv, empty)
 bindPats (PVar vid) = do
-    mv <- newMetaTVar; let tMv = TMetaVar mv;
-    return (tMv, fromList [(vid, tMv)])
+    mdcl <- lookupDC' vid 
+    case mdcl of
+        Nothing -> do 
+            mv <- newMetaTVar; let tMv = TMetaVar mv;
+            return (tMv, fromList [(vid, tMv)])
+        (Just (DataCons dcId _, _)) -> bindPats (PCons dcId [])
 bindPats (PLabel lbl inrPat) = do
     (inrTy, inrSubst) <- bindPats inrPat
     return (inrTy, insert lbl inrTy inrSubst)

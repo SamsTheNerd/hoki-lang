@@ -1,0 +1,20 @@
+data Maybe a = Just a | Nothing;
+
+data Either l r = Left l | Right r;
+
+let fromMaybe = \x -> \m -> case m of
+    Nothing -> x
+    (Just y) -> y
+
+let left = \eith -> case eith of
+    (Left x) -> (Just x)
+    (Right _) -> Nothing
+
+let right = \eith -> case eith of
+    (Left _) -> Nothing;
+    (Right y) -> (Just y)
+
+let mapEither = \f -> \g -> \eith -> case eith of
+    (Left x) -> (f x)
+    (Right y) -> (g y)
+
