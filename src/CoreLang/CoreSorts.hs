@@ -42,6 +42,7 @@ data TConstraint = CExact Type -- an exact type
                 deriving (Show, Eq)
 
 data MetaTVar = MetaTVar Int (IORef TConstraint) -- a meta variable used to build up found constraints
+              | MetaStrVar String (IORef TConstraint) -- a hack to make letrec the tiniest bit easier
     deriving (Eq)
 
 -- language primitives (would be nice to have a way to introduce new prims easily? TODO: decide how exactly to have this, have it be informed by Type constructors?)
@@ -104,6 +105,7 @@ instance Show Type where
     show (TArrow f@(TArrow _ _) t) = "(" ++ show f ++ ") -> " ++ show t
     show (TArrow f t) = show f ++ " -> " ++ show t
     show (TMetaVar (MetaTVar i ref)) = "meta@" ++ show i
+    show (TMetaVar (MetaStrVar str ref)) = "meta@" ++ show str
     show (TQuant cs body) = "forall" ++
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
     show (TCon id holes) = id ++ foldMap ((" "++). show) holes

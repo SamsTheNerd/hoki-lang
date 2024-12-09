@@ -81,9 +81,11 @@ newMetaTVarWith cons = do
 
 readMetaTVar :: MetaTVar -> Typad TConstraint
 readMetaTVar (MetaTVar _ ref) = lift $ readIORef ref
+readMetaTVar (MetaStrVar _ ref) = lift $ readIORef ref
 
 writeMetaTVar :: MetaTVar -> TConstraint -> Typad ()
 writeMetaTVar (MetaTVar _ ref) tcon = lift $ writeIORef ref tcon
+writeMetaTVar (MetaStrVar _ ref) tcon = lift $ writeIORef ref tcon
 
 
 -- newTypeVar :: Typad Type

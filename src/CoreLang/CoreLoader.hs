@@ -2,7 +2,7 @@ module CoreLang.CoreLoader where
 
 import CoreLang.PrimIntegers
 import CoreLang.CoreSorts
-import Data.Map (insert, fromList, empty, lookup, toList, singleton, union)
+import Data.Map (insert, fromList, empty, lookup, toList, singleton, union, keys)
 import CoreLang.Runad
 import CoreLang.CoreEval (eval)
 import CoreLang.Typad (TConsLookup, VarTyEnv, TError, runTypad, TypadST (TypadST))
@@ -10,6 +10,8 @@ import CoreLang.CoreTyping (inferTypeTL)
 import Data.IORef (newIORef)
 import Data.Graph (graphFromEdges, scc)
 import Control.Monad (foldM)
+import Data.List ((\\))
+import Data.Maybe (fromMaybe)
 
 -- gathering primitve groups
 
@@ -84,25 +86,42 @@ loadProgram prog = staticCheck $ foldr loadStatement emptyLProg_ (loadPrimOps pr
 
 -- takes a loaded program and checks that each statement matches its annotation (or try to infer a type for it if it has no annotation)
 staticCheck :: LProg -> IO (Either TError LProg)
-staticCheck lprog@(LProg _ _ _ venv) = foldM (\case
-    (Right val) -> (checkDepSCC val)
-    err -> const $ return err) (Right lprog) deps
+staticCheck lprog@(LProg _ _ _ venv) = do
+    lprog' <- fillTL lprog
+    foldM (\case
+            (Right val) -> (checkDepSCC val)
+            err -> const $ return err) 
+        (Right lprog') deps
     where deps = orderDeps venv
+
+-- fill out top level program statements with metavars
+fillTL :: LProg -> IO LProg
+fillTL (LProg vtenv tcl dcl venv) = do
+    let unTyd = keys venv \\ keys vtenv
+    mvs <- fromList <$> mapM (
+        \vid -> (vid,) . TMetaVar . MetaStrVar vid 
+        <$> newIORef CAny ) unTyd
+    return (LProg (mvs <> vtenv) tcl dcl venv)
+
+
 
 -- checking that a single scc is fine
 checkDepSCC :: LProg -> [Ident] -> IO (Either TError LProg)
-checkDepSCC lprog@(LProg vtenv tcl dcl venv) [dp] = case (Data.Map.lookup dp vtenv, Data.Map.lookup dp venv) of
-    -- unknown variable, throw error
-    (_, Nothing) -> return . Left $ "unknown variable " ++ show dp
-    -- has an annotation so typecheck
-    (Just ty, Just ve) -> return . Right $ lprog -- TODO: actually check stuff here
-    -- no annotation so infer one
-    (Nothing, Just ve) -> do
-        fref <- newIORef 0
-        runTypad (inferTypeTL ve) (TypadST vtenv tcl dcl fref) >>= \case
-            (Left err) -> return . Left $ err
-            (Right infTy) -> return . Right $ LProg (insert dp infTy vtenv) tcl dcl venv
-
+checkDepSCC lprog@(LProg vtenv tcl dcl venv) [dp] = do
+    -- guaranteed to have them
+    let expr = fromMaybe undefined $ Data.Map.lookup dp venv
+    let ty = fromMaybe undefined $ Data.Map.lookup dp vtenv
+    -- get type env with inferred type in there
+    vtenvE <- case ty of
+            (TMetaVar _) -> do
+                fref <- newIORef 0
+                (\case
+                    (Left err) -> Left err
+                    (Right infTy) -> Right $ Data.Map.insert dp infTy vtenv
+                    ) <$> runTypad (inferTypeTL expr) (TypadST vtenv tcl dcl fref) 
+            (ty') -> return . Right $ vtenv -- TODO: do checking here
+    return $ (\vtenv' -> LProg vtenv' tcl dcl venv ) <$> vtenvE
+    
 checkDepSCC (LProg vtenv tcl dcl venv) dps = return . Left $ "circular dependencies not yet handled"
 
 
