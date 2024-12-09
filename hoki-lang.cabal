@@ -71,6 +71,7 @@ library
                      CoreLang.Runad,
                      CoreLang.Typad,
                      CoreLang.CoreTyping,
+                     CoreLang.CoreCompiler
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -83,7 +84,7 @@ library
                       containers,
                       transformers,
                       mtl, parsec,
-                      haskeline
+                      haskeline, process
 
     -- Directories containing source files.
     hs-source-dirs:   src

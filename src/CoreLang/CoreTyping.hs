@@ -44,7 +44,7 @@ typeType :: Expr -> TyExp -> Typad ()
 -- nothing fancy should be happening with literals, so just let unify handle it
 typeType (ELit lit) exp = void $ instType' (getLiteralType lit) exp
 
-typeType (EPrimOp (PrimOp _ ty)) exp = void $ instType' ty exp
+typeType (EPrimOp (PrimOp _ ty _)) exp = void $ instType' ty exp
 
 typeType (EVar v) exp = void $ lookupVarTy v >>= flip instType' exp
 

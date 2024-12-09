@@ -4,13 +4,14 @@ import CoreLang.CoreSorts
 import CoreLang.CoreParser (readProgramFile, parseExpr)
 import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg)
 import Data.Bifunctor (Bifunctor(..))
-import Control.Monad (void)
+import Control.Monad (void, liftM2)
 import System.Console.Haskeline
 import Data.Maybe (fromMaybe)
 import CoreLang.CoreTyping (inferType, inferTypeTL)
 import CoreLang.Typad (TypadST(TypadST), runTypad)
 import Data.Map (empty, keys)
 import Data.IORef (newIORef)
+import CoreLang.CoreCompiler (haskellifyExpr, haskellifyProg)
 
 -- Core Repl Monad
 type CReplad a = InputT (StateT (Maybe FilePath, LProg) IO) a
@@ -34,29 +35,36 @@ creplDispatch "r" _ =lift get >>= \case
             (Left err) -> liftIO . putStrLn $ "error: " ++ show err
             (Right lprog) -> (lift . put $ (Just fn, lprog)) >> liftIO (putStrLn $ "loaded file: " ++ fn)
     (Nothing, _) -> outputStrLn "no program loaded"
-creplDispatch "t" expr = lift (gets snd) >>= creplInferType expr
-creplDispatch "tAll" _= lift (gets snd) >>= \lprog@(LProg _ _ _ venv) -> mapM_ (`creplInferType` lprog) (keys venv)
+creplDispatch "t" expr = creplInferType expr
+creplDispatch "h" expr = creplAct (\_ -> return . haskellifyExpr) expr
+creplDispatch "hl" _ = do
+    mayFP <- lift (gets fst)
+    mrrp <- liftIO $ maybe (return $ Right []) readProgramFile mayFP
+    outputStrLn $ either show haskellifyProg mrrp 
+creplDispatch "tAll" _= lift (gets snd) >>= \(LProg _ _ _ venv) -> mapM_ creplInferType (keys venv)
 creplDispatch cmd arg = outputStrLn $ "unknown command :"  ++ cmd
 
+creplInferType :: String -> CReplad ()
+creplInferType expr = creplAct ((\case
+            (Left err) -> ("error: " ++ err)
+            (Right resVal) -> show expr ++ " :: " ++ show resVal)
+        <$:> inferInProgram) expr
 
-creplInferType :: String -> LProg -> CReplad ()
-creplInferType inp prog = case parseExpr inp of
+creplEval :: String -> CReplad ()
+creplEval expr = creplAct ((\case
+            (Left err) -> ("error: " ++ err)
+            (Right resVal) -> show expr ++ " :: " ++ show resVal)
+        <$:> evalProgram) expr
+
+(<$:>) :: Monad m => (c -> d) -> (a -> b -> m c) -> a -> b -> m d
+af <$:> f = \x y -> af <$> f x y
+
+creplAct :: (LProg -> Expr -> IO String) -> String -> CReplad ()
+creplAct f inp = case parseExpr inp of
     (Left err) -> outputStrLn ("parse error: " ++ show err)
     (Right expr) -> do
-        res <- liftIO $ inferInProgram prog expr
-        -- res <- liftIO $ evalProgram prog expr
-        case res of
-            (Left err) -> outputStrLn ("error: " ++ err)
-            (Right resVal) -> outputStrLn $ show expr ++ " :: " ++ show resVal
-
-creplEval :: String -> LProg -> CReplad ()
-creplEval inp prog = case parseExpr inp of
-    (Left err) -> outputStrLn ("parse error: " ++ show err)
-    (Right expr) -> do
-        res <- liftIO $ evalProgram prog expr
-        case res of
-            (Left err) -> outputStrLn ("error: " ++ err)
-            (Right resVal) -> outputStrLn $ show resVal
+        lprog <- lift (gets snd)
+        liftIO (f lprog expr) >>= outputStrLn
 
 creplLoop :: CReplad ()
 creplLoop = do
@@ -67,7 +75,10 @@ creplLoop = do
         (':':inps) -> creplDispatch cmd (unwords args)
             where (cmd:args) = words inps
         "" -> return ()
-        _ ->  lift (gets snd) >>= creplEval inp
+        _ ->  creplAct ((\case
+            (Left err) -> ("error: " ++ err)
+            (Right resVal) -> show inp ++ " :: " ++ show resVal)
+            <$:> evalProgram) inp
     creplLoop
 
 startCrepl :: IO ()
