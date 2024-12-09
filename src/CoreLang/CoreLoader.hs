@@ -48,7 +48,7 @@ loadStatement (SLetRec vid bexp mAnnot) (LProg vtenv tcl dcl venv) = LProg
     $ insert vid bexp venv
 loadStatement (STypeDef tcon@(TypeCons name _ dcs)) (LProg vtenv tcl dcl venv) = foldr (
     \dc@(DataCons did _) (LProg vtenv' tcl' dcl' venv') ->
-        LProg (insert did (typeDCLambda tcon dc) vtenv') tcl' (insert did dc dcl') (insert did (mkDCLambda dc) venv')
+        LProg (insert did (typeDCLambda tcon dc) vtenv') tcl' (insert did (dc, tcon) dcl') (insert did (mkDCLambda dc) venv')
     )
     (LProg vtenv (insert name tcon tcl) dcl venv) dcs
 

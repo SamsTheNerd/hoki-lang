@@ -1,7 +1,8 @@
 module CoreLang.CoreTyping where
 import CoreLang.CoreSorts
 import CoreLang.Typad
-import Control.Monad ( void )
+import Control.Monad ( void, when )
+import Data.Map hiding (foldr, map)
 
 ---- Sam's ramblings, feel free to ignore :)
 
@@ -47,6 +48,7 @@ typeType (ELit lit) exp = void $ instType' (getLiteralType lit) exp
 typeType (EPrimOp (PrimOp _ ty _)) exp = void $ instType' ty exp
 
 typeType (EVar v) exp = void $ lookupVarTy v >>= flip instType' exp
+-- typeType (EVar v) exp = do
 
 -- infer lambda type by making new meta vars for arg and body and inferring body type in terms of arg type.
 typeType (ELambda varg body) (TInfer mv) = do
@@ -67,7 +69,50 @@ typeType (EApp fun arg) (TInfer mv) = do
     argTy <- inferType arg
     void $ unifyType fTy (TArrow argTy (TMetaVar mv))
 
+-- does type constructed stuff Just Work??
+-- typeType (ECons dcid es) exp = do
+--     (DataCons _ tys) <- lookupDC dcid
+--     (TypeCons tconId tvs _) <- lookupTCon dcid
+--     when (length tys /= length es) (typadErr $ "Wrong number of arguments for data constructor: " ++ dcid)
+--     -- let uniTys = zipWith unifyType tys es
+--     eTys <- mapM inferType es -- types of sub expressions
+--     mvs <-  mapM (const newMetaTVar) es -- list of meta vars of correct length
+--     -- let mCon = 
+--     -- instType' 
+
+--     -- zipWith unifyType
+--     return undefined
+    
+typeType (ECase expr cases) expd = do
+    exprTy <- inferType expr -- infer our argument
+    patBinds <- mapM (bindPats . fst) cases -- infer types of patterns, or atleast their shape
+    mapM_ (unifyType exprTy . fst ) patBinds -- unify pattern shapes with argument type 
+    -- we don't care about result as much as we care about filling in holes
+    let caseBinds = zipWith (\pb cas -> (snd pb, snd cas)) patBinds cases
+    mapM_ (\(subst, body) -> extendVarEnvTs subst (typeType body expd)) caseBinds
+
 typeType e exp = typadErr $ "not yet implemented check/inference of " ++ show e
+
+
+-- creates a type out of the pattern. this will likely be largely full of meta vars 
+-- but gives us a type structure to work with
+bindPats :: Pattern -> Typad (Type, Map Ident Type)
+bindPats (PAny) = do mv <- newMetaTVar; return (TMetaVar mv, empty)
+bindPats (PVar vid) = do 
+    mv <- newMetaTVar; let tMv = TMetaVar mv;
+    return (tMv, fromList [(vid, tMv)])
+bindPats (PLabel lbl inrPat) = do
+    (inrTy, inrSubst) <- bindPats inrPat
+    return (inrTy, insert lbl inrTy inrSubst)
+bindPats (PCons dcId pats) = do
+    inrBinds <- mapM bindPats pats -- bind the inner patterns
+    (_, TypeCons tcId _ _) <- lookupDC dcId
+    let fullSubst = foldr (\x acc -> snd x <> acc) empty inrBinds -- combine their subst maps
+    let inrTys = map fst inrBinds -- grab the tl types out
+    return (TCon tcId inrTys, fullSubst) -- construct a dummy cons type that represents this pattern.
+bindPats (PLit expr) = do
+    ty <- inferType expr
+    return (ty, empty)
 
 -- need a better name for this, but it does instType and handles unwrapping Expected
 instType' :: Type -> TyExp -> Typad Type
