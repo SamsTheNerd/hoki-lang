@@ -1,16 +1,11 @@
 module CoreLang.CoreRepl where
-import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets, withStateT)
+import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets)
 import CoreLang.CoreSorts
 import CoreLang.CoreParser (readProgramFile, parseExpr)
 import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg)
-import Data.Bifunctor (Bifunctor(..))
-import Control.Monad (void, liftM2)
 import System.Console.Haskeline
 import Data.Maybe (fromMaybe)
-import CoreLang.CoreTyping (inferType, inferTypeTL)
-import CoreLang.Typad (TypadST(TypadST), runTypad)
-import Data.Map (empty, keys)
-import Data.IORef (newIORef)
+import Data.Map (keys)
 import CoreLang.CoreCompiler (haskellifyExpr, haskellifyProg)
 
 -- Core Repl Monad
@@ -42,7 +37,7 @@ creplDispatch "hl" _ = do
     mrrp <- liftIO $ maybe (return $ Right []) readProgramFile mayFP
     outputStrLn $ either show haskellifyProg mrrp 
 creplDispatch "tAll" _= lift (gets snd) >>= \(LProg _ _ _ venv) -> mapM_ creplInferType (keys venv)
-creplDispatch cmd arg = outputStrLn $ "unknown command :"  ++ cmd
+creplDispatch cmd _ = outputStrLn $ "unknown command :"  ++ cmd
 
 creplInferType :: String -> CReplad ()
 creplInferType expr = creplAct ((\case
@@ -68,7 +63,6 @@ creplAct f inp = case parseExpr inp of
 
 creplLoop :: CReplad ()
 creplLoop = do
-    -- liftIO $ putStr "<3: "
     inp <- fromMaybe "" <$> getInputLine "<3: "
     case inp of
         ":" -> outputStrLn "command expected but none received"
@@ -86,5 +80,3 @@ startCrepl = do
     cprog <- coreProg
     runStateT (runInputT defaultSettings creplLoop) (Nothing, cprog)
     return ()
-
--- main = startCrepl

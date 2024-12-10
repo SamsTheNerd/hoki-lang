@@ -107,7 +107,7 @@ fillTL (LProg vtenv tcl dcl venv) = do
 
 -- checking that a single scc is fine
 checkDepSCC :: LProg -> [Ident] -> IO (Either TError LProg)
-checkDepSCC lprog@(LProg vtenv tcl dcl venv) [dp] = do
+checkDepSCC (LProg vtenv tcl dcl venv) [dp] = do
     -- guaranteed to have them
     let expr = fromMaybe undefined $ Data.Map.lookup dp venv
     let ty = fromMaybe undefined $ Data.Map.lookup dp vtenv
