@@ -67,7 +67,12 @@ library
                      CoreLang.Runad,
                      CoreLang.Typad,
                      CoreLang.CoreTyping,
-                     CoreLang.CoreCompiler
+                     CoreLang.CoreCompiler,
+                     Hoki.FrontParser,
+                     Hoki.FrontSorts,
+                     Hoki.FrontUtil,
+                     Hoki.FrontRepl,
+                     InterpLayer.InterpMap
 
     -- Modules included in this library but not exported.
     -- other-modules:

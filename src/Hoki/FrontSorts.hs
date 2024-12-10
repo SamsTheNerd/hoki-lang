@@ -1,7 +1,6 @@
 module Hoki.FrontSorts where
 
 import Hoki.FrontUtil
-import Distribution.Simple.Program (Program)
 
 type Ident = String
 
