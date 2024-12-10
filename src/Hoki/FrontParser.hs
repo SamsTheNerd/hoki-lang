@@ -10,6 +10,9 @@ import Data.Functor (($>), (<&>))
 parseFile :: String -> IO (Either ParseError Program)
 parseFile fname = parse programP "" . trim <$> readFile fname
 
+parseExpr :: String -> Either ParseError Expr
+parseExpr expr = parse exprP "" expr
+
 testFile :: String -> IO ()
 testFile fname = do ep <- parseFile fname
                     case ep of 
