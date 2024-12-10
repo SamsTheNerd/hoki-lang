@@ -6,47 +6,50 @@ import Data.List ( foldl' )
 import Control.Exception
 import CoreLang.CoreLoader (LProg(..))
 
-data InterpException = UnhandledType | Unimplemented
-    deriving (Show)
+data InterpException = Unreachable
+                     | Unimplemented
+                     | UnknownFunction Hoki.Ident
+                     deriving (Show)
 instance Exception InterpException
 
-type InterpMap = Map Hoki.Ident (Core.Expr,Core.Type)
+-- Data constructors for Bool and List
 -- Core.TypeCons "Bool" [] [DataCons "True" [], DataCons "False" []]
--- Core.TypeCons "String" [] [DataCons "StrCons" ["Char", "List Char"], DataCons "StrEmpty" []]
+-- Core.TypeCons "List" [a] [DataCons "Cons" ["a", "List a"], DataCons "Empty" []]
+
 hokiToCoreLit :: Hoki.Literal -> Core.Literal
 hokiToCoreLit (Hoki.LInt x) = Core.LInt (fromInteger x)
 hokiToCoreLit (Hoki.LDec x) = Core.LDouble x
 hokiToCoreLit (Hoki.LChar x) = Core.LChar x
-hokiToCoreLit _ = undefined
+hokiToCoreLit _ = throw Unreachable
 
 hokiToCoreArg :: Hoki.Args -> Core.Expr
 hokiToCoreArg (Hoki.Avar name) = Core.EVar name
 hokiToCoreArg (Hoki.Alit literal) = Core.ELit (hokiToCoreLit literal)
 
-hokiToCoreExpr :: LProg -> Hoki.Expr -> Core.Expr
-hokiToCoreExpr _ (Hoki.Evar name) = Core.EVar name
-hokiToCoreExpr _ (Hoki.Elit (Hoki.LBool bool)) = Core.ECons (show bool) []
-hokiToCoreExpr _ (Hoki.Elit (Hoki.LStr _)) = Core.ECons ("StrEmpty") []
--- hokiToCoreExpr _ (Hoki.Elit (Hoki.LStr (x:xs))) = Core.ECons ("StrCons") [x,xs]
---     where
---         foldStr f u xs = foldStr 
-hokiToCoreExpr _ (Hoki.Elit literal) = Core.ELit (hokiToCoreLit literal)
-hokiToCoreExpr (LProg tenv _ _ venv) (Hoki.Eapp func args) = let
-    args' = map hokiToCoreArg args
-    func' = case member func venv of
-        False -> throw Unimplemented
-        True -> venv ! func
-    in case args' of
-        [] -> throw Unimplemented
-        (x:xs) -> foldl' Core.EApp (Core.EApp func' x) xs
-hokiToCoreExpr lprog@(LProg tenv a b venv) (Hoki.Eabb name args exprs typesig) = let
-    exprscl = map (hokiToCoreExpr lprog) exprs
-    expr = case args of
-        [] -> throw Unimplemented
-        xs -> foldr Core.ELambda (Core.ELambda (last xs) (head exprscl)) (init xs)
-    -- tenv' = insert name ()
-    tenv' = tenv
-    venv' = insert name expr venv
-    lprog' = LProg tenv' a b venv'
-    in expr
-hokiToCoreExpr _ (Hoki.Econs x) = throw Unimplemented
+stringToCore :: String -> Core.Expr
+stringToCore [] = Core.ECons "Empty" []
+stringToCore (x:xs) = Core.ECons "Cons" [Core.ELit (Core.LChar x), stringToCore xs]
+
+hokiToCoreExpr :: LProg -> Hoki.Expr -> (LProg,Core.Expr)
+hokiToCoreExpr lprog (Hoki.Evar name) = (lprog,Core.EVar name)
+hokiToCoreExpr lprog (Hoki.Elit (Hoki.LBool bool)) = (lprog,Core.ECons (show bool) [])
+hokiToCoreExpr lprog (Hoki.Elit (Hoki.LStr str)) = (lprog,stringToCore str)
+hokiToCoreExpr lprog (Hoki.Elit literal) = (lprog,Core.ELit (hokiToCoreLit literal))
+hokiToCoreExpr lprog@(LProg _ _ _ venv) (Hoki.Eapp func args) = case args' of
+    [] -> throw Unimplemented
+    (x:xs) -> (lprog,foldl' Core.EApp (Core.EApp func' x) xs)
+    where
+        args' = map hokiToCoreArg args
+        func' = if member func venv
+            then venv ! func
+            else throw $ UnknownFunction func
+hokiToCoreExpr lp@(LProg tenv a b venv) (Hoki.Eabb name args exprs typesig) = (lprog',expr)
+    where
+        exprscl = map (snd . hokiToCoreExpr lp) exprs
+        expr = case args of
+            [] -> throw Unimplemented
+            xs -> foldr Core.ELambda (Core.ELambda (last xs) (head exprscl)) (init xs)
+        tenv' = tenv
+        venv' = insert name expr venv
+        lprog' = LProg tenv' a b venv'
+hokiToCoreExpr lprog (Hoki.Econs x) = throw Unimplemented
