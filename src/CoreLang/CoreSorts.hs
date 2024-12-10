@@ -91,7 +91,7 @@ instance Show Expr where
     show (ELambda x body) = "\\" ++ x ++ " -> " ++ show body
     show (EApp fn arg) = "(" ++ show fn ++ " " ++ show arg ++ ")"
     show (ELit (LInt x)) = show x
-    show (ECons id expr) = id ++ "#" ++ show expr
+    show (ECons dcid expr) = dcid ++ "#" ++ show expr
     show (ECase inp pats) = "case[" ++ show inp ++ "]{"
         ++ foldr (\(p, f) str -> 
             str ++ (if null str then "" else ";") ++"\n\t" ++ show p 
@@ -107,7 +107,7 @@ instance Show Type where
     show (TMetaVar mv) = show mv
     show (TQuant cs body) = "forall" ++
         foldMap ((" "++) . fst) cs ++ " => " ++ show body
-    show (TCon id holes) = id ++ foldMap ((" "++). show) holes
+    show (TCon tcid holes) = tcid ++ foldMap ((" "++). show) holes
     show (TNamed name) = name
 
 instance Show MetaTVar where
@@ -123,9 +123,9 @@ instance Ord MetaTVar where
 substType :: Map TVar Type -> Type -> Type
 substType subs ty@(TVar v) = fromMaybe ty (Data.Map.lookup v subs)
 substType subs (TArrow frT toT) = TArrow (substType subs frT) (substType subs toT)
-substType subs (TQuant tvs body) = TQuant tvs $ substType (Data.Map.filterWithKey (\k v -> k `notElem` map fst tvs) subs) body
+substType subs (TQuant tvs body) = TQuant tvs $ substType (Data.Map.filterWithKey (\k _ -> k `notElem` map fst tvs) subs) body
 substType subs (TCon tn ts) = TCon tn $ substType subs <$> ts
-substType subs ty = ty
+substType _ ty = ty
 
 -- replace the metavars with their given types
 substMVs :: Map MetaTVar Type -> Type -> Type
@@ -140,7 +140,7 @@ getFreeVarsE :: Expr -> [Ident]
 getFreeVarsE (EVar vn) = [vn]
 getFreeVarsE (ELambda arg body) = getFreeVarsE body \\ [arg]
 getFreeVarsE (EApp func arg) = nub $ getFreeVarsE func ++ getFreeVarsE arg
-getFreeVarsE (ECons name es) = nub $ concatMap getFreeVarsE es
+getFreeVarsE (ECons _ es) = nub $ concatMap getFreeVarsE es
 -- this def needs better handling for knocking out pattern deps
 getFreeVarsE (ECase arg ps) = nub $ getFreeVarsE arg ++ concatMap (\(p, e) -> getFreeVarsE e \\ getBindersP p) ps
 getFreeVarsE (ELit _) = []
@@ -152,7 +152,7 @@ getBindersP PAny = []
 getBindersP (PLit _) = []
 getBindersP (PLabel name inP) = name:getBindersP inP
 getBindersP (PVar name) = [name]
-getBindersP (PCons name ps) = nub $ concatMap getBindersP ps
+getBindersP (PCons _ ps) = nub $ concatMap getBindersP ps
 
 -- some data types defined here to avoid circular deps
 

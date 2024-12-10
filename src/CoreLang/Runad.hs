@@ -1,5 +1,5 @@
 module CoreLang.Runad where
-import Data.Map ( empty, insert, lookup, Map, singleton )
+import Data.Map ( lookup, singleton )
 import CoreLang.CoreSorts
 import Control.Monad
 
@@ -13,9 +13,7 @@ runRunAd (Runad rad) = rad
 
 -- sensibly drop all unneeded in data
 passInOut :: RunadSTIn -> RunadSTOut
-passInOut (RunadSTIn venv dcl fr) = RunadSTOut fr
-
-testAd rad = runRunAd rad (RunadSTIn empty empty 0)
+passInOut (RunadSTIn _ _ fr) = RunadSTOut fr
 
 instance Functor Runad where 
     fmap f rad = Runad $ \st -> do
@@ -45,22 +43,6 @@ getRST = Runad (\st -> return (Right st, passInOut st))
 modRST :: (RunadSTIn -> RunadSTOut) -> Runad ()
 modRST f = Runad (\st -> return (Right (), f st))
 
--- modRST' :: (VarEnv -> VarEnv) -> (Int -> Int) -> Runad ()
--- modRST' envF fintF = Runad $ \(RunadST env fint) 
---     -> return (Left (), RunadST (envF env) (fintF fint))
-
--- stGetEnv :: RunadST -> VarEnv
--- stGetEnv (RunadST env _ ) = env;
-
--- stModEnv :: (VarEnv -> VarEnv) -> RunadST -> RunadST
--- stModEnv f (RunadST env fr) = RunadST (f env ) fr
-
--- stGetFInt :: RunadST -> Int
--- stGetFInt (RunadST _ fint) = fint
-
--- stModFInt :: (Int -> Int) -> RunadST -> RunadST
--- stModFInt f (RunadST env fr) = RunadST env (f fr)
-
 -- can use these 
 
 runadErr :: EError -> Runad a
@@ -69,8 +51,8 @@ runadErr err = Runad $ \st -> return (Left err, passInOut st)
 -- alpha renames the given identifier to a new name
 gecrFresh :: Ident -> Runad Ident
 gecrFresh vid = do
-    st@(RunadSTIn _ _ fint) <- getRST
-    modRST (\(RunadSTIn env dcl fint') -> RunadSTOut fint')
+    (RunadSTIn _ _ fint) <- getRST
+    modRST (\(RunadSTIn _ _ fint') -> RunadSTOut fint')
     return $ vid ++ show fint
 
 lookupVar :: Ident -> Runad (Maybe Expr)
@@ -89,11 +71,6 @@ lookupVar' v = do
     case Data.Map.lookup v env of
         (Just expr) -> return expr
         _ -> runadErr $ "Undefined variable " ++ v
-
--- currently *only* binds the given variable. does not substitute its value in others
--- extendVarEnv :: Ident -> Expr -> Runad ()
--- bindVar v expr = do
---     mod
 
 -- runs the given monad in the extended environment
 extendVarEnv :: Ident -> Expr -> Runad a -> Runad a

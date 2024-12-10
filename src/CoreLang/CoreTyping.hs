@@ -1,12 +1,11 @@
 module CoreLang.CoreTyping where
 import CoreLang.CoreSorts
 import CoreLang.Typad
-import Control.Monad ( void, when, zipWithM, zipWithM_, foldM, foldM_ )
+import Control.Monad ( void, zipWithM_ )
 import Data.Map hiding (foldr, map)
 
 ---- Sam's ramblings, feel free to ignore :)
 
--- TODO: clarify where TConstraint should fit in here?
 -- TConstraint represents a constraint, which currently is just locked to a type (CExact) or floating (CAny), but may more generally represent a family of allowed types. 
 -- In haskell we're used to seeing quantified/polymorphic types like `Maybe a` or `[(a,b)]`, where the type is quantified over a given type variable. We generally represent that with `TQuant [tvars] typebody`
 -- We're also used to seeing typeclasses as `Constraint tvar => TCon tvar tvar ..`. So it feels natural to want to smush constraints in with quantified typing, since we really only need to explicitly constrain quantified tvars, all other constraints can get simply substituted directly
@@ -59,11 +58,11 @@ data TyExp = TCheck Type -- check against the given type
 typeType :: Expr -> TyExp -> Typad ()
 
 -- nothing fancy should be happening with literals, so just let unify handle it
-typeType (ELit lit) exp = void $ instType' (getLiteralType lit) exp
+typeType (ELit lit) expr = void $ instType' (getLiteralType lit) expr
 
-typeType (EPrimOp (PrimOp _ ty _)) exp = void $ instType' ty exp
+typeType (EPrimOp (PrimOp _ ty _)) expr = void $ instType' ty expr
 
-typeType (EVar v) exp = void $ lookupVarTy v >>= flip instType' exp
+typeType (EVar v) expr = void $ lookupVarTy v >>= flip instType' expr
 -- typeType (EVar v) exp = do
 
 -- infer lambda type by making new meta vars for arg and body and inferring body type in terms of arg type.
@@ -85,19 +84,7 @@ typeType (EApp fun arg) (TInfer mv) = do
     argTy <- inferType arg
     void $ unifyType fTy (TArrow argTy (TMetaVar mv))
 
--- does type constructed stuff Just Work??
--- typeType (ECons dcid es) exp = do
---     (DataCons _ tys) <- lookupDC dcid
---     (TypeCons tconId tvs _) <- lookupTCon dcid
---     when (length tys /= length es) (typadErr $ "Wrong number of arguments for data constructor: " ++ dcid)
---     -- let uniTys = zipWith unifyType tys es
---     eTys <- mapM inferType es -- types of sub expressions
---     mvs <-  mapM (const newMetaTVar) es -- list of meta vars of correct length
---     -- let mCon = 
---     -- instType' 
-
---     -- zipWith unifyType
---     return undefined
+-- does type constructed stuff Just Work?? appears to. come back here (and review pre-cleanup git history) if this bites us later
 
 typeType (ECase expr cases) expd = do
     exprTy <- inferType expr -- infer our argument
@@ -106,20 +93,14 @@ typeType (ECase expr cases) expd = do
     -- we don't care about result as much as we care about filling in holes
     let caseBinds = zipWith (\pb cas -> (snd pb, snd cas)) patBinds cases
     mapM_ (\(subst, body) -> extendVarEnvTs subst (typeType body expd)) caseBinds
-    -- case expd of
-    --     (TInfer mv) -> do 
-    --         bTys <- mapM (\(subst, body) -> extendVarEnvTs subst (inferType body)) caseBinds
-    --         foldM_ unifyType (TMetaVar mv) bTys
-    --     (TCheck chTy) -> do
-    --         mapM_ (\(subst, body) -> extendVarEnvTs subst (checkType body chTy)) caseBinds
 
-typeType e exp = typadErr $ "not yet implemented check/inference of " ++ show e
+typeType e _ = typadErr $ "not yet implemented check/inference of " ++ show e
 
 
 -- creates a type out of the pattern. this will likely be largely full of meta vars 
 -- but gives us a type structure to work with
 bindPats :: Pattern -> Typad (Type, Map Ident Type)
-bindPats (PAny) = do mv <- newMetaTVar; return (TMetaVar mv, empty)
+bindPats PAny = do mv <- newMetaTVar; return (TMetaVar mv, empty)
 bindPats (PVar vid) = do
     mdcl <- lookupDC' vid 
     case mdcl of
@@ -145,9 +126,7 @@ bindPats (PLit expr) = do
 -- ex: unifyCons "ListCons" [Int, List Int] == List Int
 unifyCons :: Ident -> [Type] -> Typad Type
 unifyCons dcId instArgs = do
-    (dc@(DataCons _ dcArgs), tc@(TypeCons tcId tvs _)) <- lookupDC dcId
-    -- tcTy <- instType $ TCon tcId (TVar <$> tvs) -- a placeholder filled instance of this constructed type.
-    -- subst <- fromList <$> mapM (\tv -> (\mv -> (tv, TMetaVar mv)) <$> newMetaTVar) tvs
+    (DataCons _ dcArgs, TypeCons tcId tvs _) <- lookupDC dcId
     mvs <- mapM (const $ TMetaVar <$> newMetaTVar) tvs -- a meta var for each type cons tvar
     let subst = fromList $ zip tvs mvs
     let sArgs = map (substType subst) dcArgs -- replace tvars with placeholders in arg types

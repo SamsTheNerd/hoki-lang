@@ -1,16 +1,11 @@
 module CoreLang.CoreRepl where
-import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets, withStateT)
+import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets)
 import CoreLang.CoreSorts
 import CoreLang.CoreParser (readProgramFile, parseExpr)
 import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg)
-import Data.Bifunctor (Bifunctor(..))
-import Control.Monad (void, liftM2)
 import System.Console.Haskeline
 import Data.Maybe (fromMaybe)
-import CoreLang.CoreTyping (inferType, inferTypeTL)
-import CoreLang.Typad (TypadST(TypadST), runTypad)
-import Data.Map (empty, keys)
-import Data.IORef (newIORef)
+import Data.Map (keys)
 import CoreLang.CoreCompiler (haskellifyExpr, haskellifyProg)
 
 -- Core Repl Monad
@@ -41,8 +36,15 @@ creplDispatch "hl" _ = do
     mayFP <- lift (gets fst)
     mrrp <- liftIO $ maybe (return $ Right []) readProgramFile mayFP
     outputStrLn $ either show haskellifyProg mrrp 
-creplDispatch "tAll" _= lift (gets snd) >>= \(LProg _ _ _ venv) -> mapM_ creplInferType (keys venv)
-creplDispatch cmd arg = outputStrLn $ "unknown command :"  ++ cmd
+creplDispatch "tAll" _ = lift (gets snd) >>= \(LProg _ _ _ venv) -> mapM_ creplInferType (keys venv)
+creplDispatch "help" _ = outputStrLn $ "\nWelcome to the crepl! (core repl) \n\
+                                       \You can enter expressions to evaluate them in the context of the currently loaded program or use one of the following commands:\n\n\
+                                       \:help         -- display this help screen\n\
+                                       \:l <filepath> -- load the given core-lang file\n\
+                                       \:r            -- reload the currently loaded core-lang file\n\
+                                       \:t <expr>     -- infers the type of the given expression\n\
+                                       \:tAll         -- displays the inferred types of all variables in the current environment\n"
+creplDispatch cmd _ = outputStrLn $ "unknown command :"  ++ cmd ++ "\n\tuse :help to see all available commands"
 
 creplInferType :: String -> CReplad ()
 creplInferType expr = creplAct ((\case
@@ -68,7 +70,6 @@ creplAct f inp = case parseExpr inp of
 
 creplLoop :: CReplad ()
 creplLoop = do
-    -- liftIO $ putStr "<3: "
     inp <- fromMaybe "" <$> getInputLine "<3: "
     case inp of
         ":" -> outputStrLn "command expected but none received"
@@ -86,5 +87,3 @@ startCrepl = do
     cprog <- coreProg
     runStateT (runInputT defaultSettings creplLoop) (Nothing, cprog)
     return ()
-
--- main = startCrepl
