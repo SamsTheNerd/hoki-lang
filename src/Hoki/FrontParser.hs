@@ -83,13 +83,13 @@ testP = do many <- manyTill iP $ lookAhead $ char 'a'
         where iP = do {wsP; integralP}
 
 
-litP :: Parser Expr
-litP = Elit <$> (    try (LDec  <$> decimalP)
-                 <|> try (LInt  <$> integralP)
-                 <|> try (LChar <$> charP)
-                 <|> try (LStr  <$> stringP)
-                 <|> try (LBool <$> boolP)
-                )
+litP :: Parser Literal
+litP =  try $  (LDec  <$> decimalP)
+           <|> (LInt  <$> integralP)
+           <|> (LChar <$> charP)
+           <|> (LStr  <$> stringP)
+           <|> (LBool <$> boolP)
+        
 
 
 
@@ -118,10 +118,26 @@ abbP = do args <- many1 $ do {v <- varP; wsP'; return v}
           body <- sepBy1 exprP wsP'
           return $ Eabb (last args) (init args) body Nothing
 
+funcP :: Parser Ident
+funcP = foldr1 (<|>) $ map string
+           [
+            "<-", "->", "<><", "<>", "><", "<>[<", "<>]<",
+             "+",  "-",   "×",  "÷",  "=",    ">",    "<",
+            "<<", "<<",   "∠",  "⦤",  "ⁿ"
+           ]
 
+
+argP :: Int -> Parser [Args]
+argP n = count n (do {a <- (Alit <$> litP) <|> Avar <$> varP; wsP'; return a})
+
+appP :: Parser Expr
+appP = do args <- argP 10
+          f <- funcP
+          return $ Eapp f args  
 exprP :: Parser Expr
-exprP = try  $  litP
+exprP = try  $  Elit <$> litP
             <|> abbP
+            <|> appP
             <|> Evar <$> varP
 
 line :: Parser String
@@ -140,6 +156,6 @@ programP = Prog <$> do e <- exprP
                                           do lines'
                                              exprP
                                        )
-                       --option [] lines'
+                       option [] lines'
                        eof
                        return $ e:es
