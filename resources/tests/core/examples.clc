@@ -1,0 +1,8 @@
+import resources/tests/core/lists.clc
+
+let fib = (Cons 1 (Cons 1 (zipWith intAdd (tail fib) fib)))
+
+let fibn = \n -> case n of
+    0 -> 1; 1 -> 1;
+    _ -> (intAdd (fibn (intAdd n (intNeg 1))) (fibn (intAdd n (intNeg 2))));
+
