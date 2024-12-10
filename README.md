@@ -66,6 +66,8 @@ To run the hoki-core-repl:
 > cabal run core-repl
 ```
 
+You can see the available repl commands by typing `:help`
+
 You can also run:
 ```
 > cabal install
