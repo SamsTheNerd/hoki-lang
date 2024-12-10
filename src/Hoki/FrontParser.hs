@@ -106,7 +106,7 @@ keywords = foldr1 (<|>) $ map string
 varP :: Parser Ident
 varP = do lookAhead $ notFollowedBy keywords
           wsP
-          pre <- noneOf "1234567890[](){}'\"\\ \t\n\r;\0"
+          pre <- noneOf "1234567890'\"\\ \t\n\r;\0"
           var <- many $ noneOf " \\\t\n\r\0;"
           return $ pre:var
           
@@ -120,8 +120,8 @@ abbP = do args <- many1 $ do {v <- varP; wsP'; return v}
 
 
 exprP :: Parser Expr
-exprP = try  $  abbP
-            <|> litP
+exprP = try  $  litP
+            <|> abbP
             <|> Evar <$> varP
 
 line :: Parser String
@@ -140,6 +140,6 @@ programP = Prog <$> do e <- exprP
                                           do lines'
                                              exprP
                                        )
-                       option [] lines'
+                       --option [] lines'
                        eof
                        return $ e:es
