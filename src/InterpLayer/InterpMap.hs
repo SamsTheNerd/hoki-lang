@@ -37,12 +37,9 @@ hokiToCoreExpr lprog (Hoki.Elit (Hoki.LStr str)) = (lprog,stringToCore str)
 hokiToCoreExpr lprog (Hoki.Elit literal) = (lprog,hokiToCoreLit literal)
 hokiToCoreExpr lprog@(LProg _ _ _ venv) (Hoki.Eapp func args) = case args' of
     [] -> throw Unimplemented
-    (x:xs) -> (lprog,foldl' Core.EApp (Core.EApp func' x) xs)
+    (x:xs) -> (lprog,foldl' Core.EApp (Core.EApp (Core.EVar func) x) xs)
     where
         args' = map hokiToCoreArg args
-        func' = if member func venv
-            then venv ! func
-            else throw $ UnknownFunction func
 hokiToCoreExpr lp@(LProg tenv a b venv) (Hoki.Eabb name args exprs typesig) = (lprog',expr)
     where
         exprscl = map (snd . hokiToCoreExpr lp) exprs
