@@ -12,10 +12,6 @@ data InterpException = Unreachable
                      deriving (Show)
 instance Exception InterpException
 
--- Data constructors for Bool and List
--- Core.TypeCons "Bool" [] [DataCons "True" [], DataCons "False" []]
--- Core.TypeCons "List" [a] [DataCons "Cons" ["a", "List a"], DataCons "Empty" []]
-
 hokiToCoreLit :: Hoki.Literal -> Core.Expr
 hokiToCoreLit (Hoki.LInt x) = Core.ECons "NumInt" [Core.ELit $ Core.LInt (fromInteger x)]
 hokiToCoreLit (Hoki.LDec x) = Core.ECons "NumDouble" [Core.ELit $ Core.LDouble x]
@@ -36,15 +32,16 @@ hokiToCoreExpr lprog (Hoki.Elit (Hoki.LBool bool)) = (lprog,Core.ECons (show boo
 hokiToCoreExpr lprog (Hoki.Elit (Hoki.LStr str)) = (lprog,stringToCore str)
 hokiToCoreExpr lprog (Hoki.Elit literal) = (lprog,hokiToCoreLit literal)
 hokiToCoreExpr lprog@(LProg _ _ _ venv) (Hoki.Eapp func args) = case args' of
-    [] -> throw Unimplemented
-    (x:xs) -> (lprog,foldl' Core.EApp (Core.EApp (Core.EVar func) x) xs)
+    [] -> func'
+    (x:xs) -> (lprog,foldl' Core.EApp (Core.EApp func' x) xs)
     where
+        func' = Core.EVar func
         args' = map hokiToCoreArg args
 hokiToCoreExpr lp@(LProg tenv a b venv) (Hoki.Eabb name args exprs typesig) = (lprog',expr)
     where
         exprscl = map (snd . hokiToCoreExpr lp) exprs
         expr = case args of
-            [] -> throw Unimplemented
+            [] -> head exprscl
             xs -> foldr Core.ELambda (Core.ELambda (last xs) (head exprscl)) (init xs)
         tenv' = tenv
         venv' = insert name expr venv
