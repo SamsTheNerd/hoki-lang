@@ -63,6 +63,7 @@ library
                      CoreLang.CoreRepl,
                      CoreLang.CoreParser,
                      CoreLang.PrimIntegers,
+                     CoreLang.PrimDoubles,
                      CoreLang.CoreLoader,
                      CoreLang.Runad,
                      CoreLang.Typad,
@@ -72,7 +73,8 @@ library
                      Hoki.FrontSorts,
                      Hoki.FrontUtil,
                      Hoki.FrontRepl,
-                     InterpLayer.InterpMap
+                     InterpLayer.InterpMap,
+                     InterpLayer.InterpSetup
 
     -- Modules included in this library but not exported.
     -- other-modules:

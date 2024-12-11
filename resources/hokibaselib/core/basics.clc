@@ -1,0 +1,38 @@
+# arithmetic
+
+data Num = NumInt PrimInt | NumDouble PrimDouble;
+
+let add = \x -> \y -> case (Pair x y) of
+    (Pair (NumInt i) (NumInt j)) -> (NumInt (intAdd i j))
+    (Pair (NumDouble i) (NumDouble j)) -> (NumDouble (dbAdd i j))
+    (Pair (NumInt i) (NumDouble j)) -> (NumDouble (dbAdd (intToDouble i) j))
+    (Pair (NumDouble i) (NumInt j)) -> (NumDouble (dbAdd i (intToDouble j)))
+
+let mul = \x -> \y -> case (Pair x y) of
+    (Pair (NumInt i) (NumInt j)) -> (NumInt (intMul i j))
+    (Pair (NumDouble i) (NumDouble j)) -> (NumDouble (dbMul i j))
+    (Pair (NumInt i) (NumDouble j)) -> (NumDouble (dbMul (intToDouble i) j))
+    (Pair (NumDouble i) (NumInt j)) -> (NumDouble (dbMul i (intToDouble j)))
+
+data Bool = True | False;
+
+# lists
+
+data List a = Cons a (List a) | Empty;
+
+let head = \l -> case l of
+    (Cons x _) -> x;
+
+let tail = \l -> case l of
+    Empty -> Empty
+    (Cons _ xs) -> xs;
+
+# pairs
+
+data Pair a b = Pair (a) (b);
+
+let fst = \t -> case t of
+    (Pair x _) -> x;
+
+let snd = \t -> case t of
+    (Pair _ y) -> y;

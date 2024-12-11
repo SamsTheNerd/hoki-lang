@@ -9,6 +9,7 @@ import Data.Map (keys)
 import CoreLang.CoreCompiler (haskellifyExpr, haskellifyProg)
 import Hoki.FrontParser (exprP, parseExpr)
 import InterpLayer.InterpMap (hokiToCoreExpr)
+import InterpLayer.InterpSetup (hokiProg)
 
 -- Core Repl Monad
 type HKreplad a = InputT (StateT (Maybe FilePath, LProg) IO) a
@@ -60,8 +61,9 @@ hkreplAct :: (LProg -> Expr -> IO String) -> String -> HKreplad ()
 hkreplAct f inp = case Hoki.FrontParser.parseExpr inp of
     (Left err) -> outputStrLn ("parse error: " ++ show err)
     (Right expr) -> do
-        lprog <- lift (gets snd)
-        let cexpr = hokiToCoreExpr lprog expr
+        (fn, lprog) <- lift get
+        let (lprog', cexpr) = hokiToCoreExpr lprog expr
+        lift (put (fn, lprog'))
         liftIO (f lprog cexpr) >>= outputStrLn
 
 hkreplLoop :: HKreplad ()
@@ -80,6 +82,6 @@ hkreplLoop = do
 
 starthkrepl :: IO ()
 starthkrepl = do
-    cprog <- coreProg
+    cprog <- hokiProg
     runStateT (runInputT defaultSettings hkreplLoop) (Nothing, cprog)
     return ()

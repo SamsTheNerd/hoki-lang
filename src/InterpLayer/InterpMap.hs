@@ -16,15 +16,15 @@ instance Exception InterpException
 -- Core.TypeCons "Bool" [] [DataCons "True" [], DataCons "False" []]
 -- Core.TypeCons "List" [a] [DataCons "Cons" ["a", "List a"], DataCons "Empty" []]
 
-hokiToCoreLit :: Hoki.Literal -> Core.Literal
-hokiToCoreLit (Hoki.LInt x) = Core.LInt (fromInteger x)
-hokiToCoreLit (Hoki.LDec x) = Core.LDouble x
-hokiToCoreLit (Hoki.LChar x) = Core.LChar x
+hokiToCoreLit :: Hoki.Literal -> Core.Expr
+hokiToCoreLit (Hoki.LInt x) = Core.ECons "NumInt" [Core.ELit $ Core.LInt (fromInteger x)]
+hokiToCoreLit (Hoki.LDec x) = Core.ECons "NumDouble" [Core.ELit $ Core.LDouble x]
+hokiToCoreLit (Hoki.LChar x) = Core.ELit $ Core.LChar x
 hokiToCoreLit _ = throw Unreachable
 
 hokiToCoreArg :: Hoki.Args -> Core.Expr
 hokiToCoreArg (Hoki.Avar name) = Core.EVar name
-hokiToCoreArg (Hoki.Alit literal) = Core.ELit (hokiToCoreLit literal)
+hokiToCoreArg (Hoki.Alit literal) = hokiToCoreLit literal
 
 stringToCore :: String -> Core.Expr
 stringToCore [] = Core.ECons "Empty" []
@@ -34,7 +34,7 @@ hokiToCoreExpr :: LProg -> Hoki.Expr -> (LProg,Core.Expr)
 hokiToCoreExpr lprog (Hoki.Evar name) = (lprog,Core.EVar name)
 hokiToCoreExpr lprog (Hoki.Elit (Hoki.LBool bool)) = (lprog,Core.ECons (show bool) [])
 hokiToCoreExpr lprog (Hoki.Elit (Hoki.LStr str)) = (lprog,stringToCore str)
-hokiToCoreExpr lprog (Hoki.Elit literal) = (lprog,Core.ELit (hokiToCoreLit literal))
+hokiToCoreExpr lprog (Hoki.Elit literal) = (lprog,hokiToCoreLit literal)
 hokiToCoreExpr lprog@(LProg _ _ _ venv) (Hoki.Eapp func args) = case args' of
     [] -> throw Unimplemented
     (x:xs) -> (lprog,foldl' Core.EApp (Core.EApp func' x) xs)

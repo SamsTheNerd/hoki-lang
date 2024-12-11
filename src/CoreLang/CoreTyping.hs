@@ -1,7 +1,7 @@
 module CoreLang.CoreTyping where
 import CoreLang.CoreSorts
 import CoreLang.Typad
-import Control.Monad ( void, zipWithM_ )
+import Control.Monad ( void, zipWithM_, when, zipWithM )
 import Data.Map hiding (foldr, map)
 
 ---- Sam's ramblings, feel free to ignore :)
@@ -84,7 +84,28 @@ typeType (EApp fun arg) (TInfer mv) = do
     argTy <- inferType arg
     void $ unifyType fTy (TArrow argTy (TMetaVar mv))
 
--- does type constructed stuff Just Work?? appears to. come back here (and review pre-cleanup git history) if this bites us later
+-- does type constructed stuff Just Work?? appears to. come back here (and review pre-cleanup git history) if this bites us later.
+typeType (ECons dcId es) expd = do
+    (DataCons _ dcArgs, _) <- lookupDC dcId
+    when (length dcArgs /= length es) (typadErr $ "Wrong number of arguments for data constructor: " ++ dcId)
+
+    -- mvs <- mapM (const $ TMetaVar <$> newMetaTVar) tvs -- a meta var for each type cons tvar
+    -- let subst = fromList $ zip tvs mvs
+    -- let sArgs = map (substType subst) dcArgs -- replace tvars with placeholders in dc arg types
+
+    -- let tconInst = TCon tcId mvs -- tcon type with holes
+
+    emvs <- mapM (const newMetaTVar) es -- a metavar for each sub expression in the dc
+    tconInst <- unifyCons dcId (map TMetaVar emvs) -- a tcon type with holes corresponding to the expression types
+
+    case expd of
+            (TInfer mv) -> do 
+                mapM_ (\(ex, mv') -> typeType ex (TInfer mv')) (zip es emvs) -- infer sub expressions 
+                unifyType (TMetaVar mv) tconInst -- return full tcon (holes should now be filled)
+                return ()
+            (TCheck chTy) -> do
+                unifyType chTy tconInst -- fill holes 
+                mapM_ (\(ex, mv') -> typeType ex (TCheck (TMetaVar mv'))) (zip es emvs) -- check sub expressions 
 
 typeType (ECase expr cases) expd = do
     exprTy <- inferType expr -- infer our argument
@@ -102,9 +123,9 @@ typeType e _ = typadErr $ "not yet implemented check/inference of " ++ show e
 bindPats :: Pattern -> Typad (Type, Map Ident Type)
 bindPats PAny = do mv <- newMetaTVar; return (TMetaVar mv, empty)
 bindPats (PVar vid) = do
-    mdcl <- lookupDC' vid 
+    mdcl <- lookupDC' vid
     case mdcl of
-        Nothing -> do 
+        Nothing -> do
             mv <- newMetaTVar; let tMv = TMetaVar mv;
             return (tMv, fromList [(vid, tMv)])
         (Just (DataCons dcId _, _)) -> bindPats (PCons dcId [])

@@ -1,6 +1,6 @@
 module CoreLang.Typad where
 import CoreLang.CoreSorts
-import Data.Map hiding ((\\), map)
+import Data.Map hiding (null, (\\), map)
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef', writeIORef)
 import Control.Monad (ap, void, zipWithM, when)
 import Data.List (nub, (\\))
@@ -226,7 +226,7 @@ quantifyType ty = do
     let mvSubst = zipWith (\mv tv -> (mv, TVar tv)) mvs tvs
     let tvars = map ((, CAny)) tvs
     let bodyTy = substMVs (fromList mvSubst) ty
-    return $ TQuant tvars bodyTy
+    return $ if null tvars then bodyTy else TQuant tvars bodyTy 
 
 ------------------------------------------------------------------------------
 --              Unification
@@ -298,6 +298,10 @@ unifyType ty1@(TCon tn1 ts1) ty2@(TCon tn2 ts2) = if tn1 /= tn2 || length ts1 /=
     TCon tn1 <$> zipWithM unifyType ts1 ts2
 
 unifyType ty1@(TNamed n1) ty2@(TNamed n2) = if n1 == n2 then return ty1 else typadErr $ " Could not unify types " ++ show ty1 ++ " with " ++ show ty2
+
+-- why do named types exist separate from type vars again?? idk handle that case though
+unifyType ty1@(TVar v1) ty2@(TNamed n2) = if v1 == n2 then return ty1 else typadErr $ " Could not unify types " ++ show ty1 ++ " with " ++ show ty2
+unifyType ty1@(TNamed n1) ty2@(TVar v2) = if n1 == v2 then return ty1 else typadErr $ " Could not unify types " ++ show ty1 ++ " with " ++ show ty2
 
 unifyType ty1 ty2 = typadErr $ "Unhandled unification of types " ++ show ty1 ++ " and " ++ show ty2
 

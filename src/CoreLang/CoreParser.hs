@@ -241,3 +241,40 @@ bSpaces = skipMany bSpaces_
 
 bSpaces1 :: Parser ()
 bSpaces1 = skipMany1 bSpaces_
+
+-- unparse for easier last minute prim making
+
+getPFAsHs :: FilePath -> IO String
+getPFAsHs fp = (either show (foldMap ((++ ",\n\n") . showHs))) <$> readProgramFile fp
+
+-- reimplementing derived show (seems haskell doesn't have a builtin way to do this??)
+
+class ShowHs a where
+    showHs :: a -> String
+
+instance ShowHs a => ShowHs [a] where
+    showHs [] = "[]"
+    showHs xs = "[" ++ foldr (\s ss -> ss ++ ", " ++ showHs s) (showHs $ head xs) (tail xs) ++ "]"
+
+instance (ShowHs a, ShowHs b) => ShowHs (a,b) where
+    showHs (x,y) = "(" ++ showHs x ++ ", " ++ showHs y ++ ")"
+
+instance ShowHs Expr where
+    showHs (EVar v) = "EVar " ++ show v
+    showHs (ELambda x body) = "ELambda (" ++ show x ++ ") (" ++ showHs body ++ ")"
+    showHs (EApp fn arg) = "EApp (" ++ showHs fn ++ ") (" ++ showHs arg ++ ")"
+    showHs (ELit lit) = show lit
+    showHs (ECons dcid expr) = "ECons " ++ show dcid ++ " (" ++ showHs expr ++ ")"
+    showHs (ECase inp pats) = "ECase (" ++ showHs inp ++ ") " ++ showHs pats
+    showHs (EPrimOp (PrimOp _ ty _)) = undefined
+
+instance ShowHs Pattern where
+    showHs PAny = "PAny"
+    showHs (PLit e) = "PLit (" ++ showHs e ++ ")"
+    showHs (PLabel name inP) = "PLabel " ++ show name ++ " (" ++ showHs inP ++ ")"
+    showHs (PVar name) = "PVar " ++ show name
+    showHs (PCons dcid ps) = "PCons " ++ show dcid ++ " (" ++ showHs ps ++ ")"
+
+instance ShowHs Statement where
+    showHs (SLetRec sid expr mayTy) = "SLetRec " ++ show sid ++ " (" ++ showHs expr ++ ") " ++ "Nothing" -- no types rn
+    showHs (STypeDef tcons) = "STypeDef (" ++ show tcons ++ ")"

@@ -12,6 +12,7 @@ import Data.Graph (graphFromEdges, scc)
 import Control.Monad (foldM)
 import Data.List ((\\))
 import Data.Maybe (fromMaybe)
+import CoreLang.PrimDoubles (primDoubleOps)
 
 -- gathering primitve groups
 
@@ -32,7 +33,8 @@ coreProg = do
 -- TODO: maybe have a better structure for primops if this gets cumbersome
 primGroups :: [[(String, Expr)]]
 primGroups = [
-    primIntOps
+    primIntOps,
+    primDoubleOps
     ]
 
 allPrimOps :: [(String, Expr)]
