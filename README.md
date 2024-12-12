@@ -50,7 +50,7 @@ For some examples of core-lang tests, see resources/tests/core/. These can be lo
 
 ### Hoki -> Core Translation
 
-***TODO FILL OUT***
+The Interpretation Layer simply takes the existing Hoki expressions and translates them into the corresponding Core expression type for utilization in type checking to ensure expressions are properly typed. This involves a function to translate literal types, a function to translate type signatures if provided for function abstractions, a function to convert strings to the data constructor types, and s function to translate the expressions themselves.
 
 ## Setup 
 
