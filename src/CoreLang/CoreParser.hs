@@ -150,6 +150,9 @@ fullExprP = do e <- exprP; eof; return e
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse fullExprP  ""
 
+parseType :: String -> Either ParseError Type
+parseType = parse typeP  ""
+
 parseExpr' str = case parseExpr str of
     Right exp -> exp
 

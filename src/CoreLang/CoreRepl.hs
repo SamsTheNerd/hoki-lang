@@ -1,12 +1,13 @@
 module CoreLang.CoreRepl where
 import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets)
 import CoreLang.CoreSorts
-import CoreLang.CoreParser (readProgramFile, parseExpr)
-import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg)
+import CoreLang.CoreParser (readProgramFile, parseExpr, parseType)
+import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg, runTypadInProgram)
 import System.Console.Haskeline
 import Data.Maybe (fromMaybe)
 import Data.Map (keys)
 import CoreLang.CoreCompiler (haskellifyExpr, haskellifyProg)
+import CoreLang.Typad (getKind)
 
 -- Core Repl Monad
 type CReplad a = InputT (StateT (Maybe FilePath, LProg) IO) a
@@ -31,6 +32,7 @@ creplDispatch "r" _ =lift get >>= \case
             (Right lprog) -> (lift . put $ (Just fn, lprog)) >> liftIO (putStrLn $ "loaded file: " ++ fn)
     (Nothing, _) -> outputStrLn "no program loaded"
 creplDispatch "t" expr = creplInferType expr
+creplDispatch "k" ty = creplGetKind ty
 creplDispatch "h" expr = creplAct (\_ -> return . haskellifyExpr) expr
 creplDispatch "hl" _ = do
     mayFP <- lift (gets fst)
@@ -51,6 +53,13 @@ creplInferType expr = creplAct ((\case
             (Left err) -> ("error: " ++ err)
             (Right resVal) -> show expr ++ " :: " ++ show resVal)
         <$:> inferInProgram) expr
+
+creplGetKind :: String -> CReplad ()
+creplGetKind inp = case parseType inp of
+    (Left err) -> outputStrLn ("parse error: " ++ show err)
+    (Right ty) -> do
+        lprog <- lift (gets snd)
+        liftIO (runTypadInProgram lprog $ getKind ty) >>= (outputStrLn . either ("type error: " ++) show)
 
 creplEval :: String -> CReplad ()
 creplEval expr = creplAct ((\case

@@ -5,7 +5,7 @@ import CoreLang.CoreSorts
 import Data.Map (insert, fromList, empty, lookup, toList, singleton, union, keys)
 import CoreLang.Runad
 import CoreLang.CoreEval (eval)
-import CoreLang.Typad (TConsLookup, VarTyEnv, TError, runTypad, TypadST (TypadST))
+import CoreLang.Typad (TConsLookup, VarTyEnv, TError, runTypad, TypadST (TypadST), Typad)
 import CoreLang.CoreTyping (inferTypeTL, inferTypeTLRec)
 import Data.IORef (newIORef)
 import Data.Graph (graphFromEdges, scc)
@@ -76,6 +76,12 @@ inferInProgram prog expr = do
         -- type check expression in program
         fref <- newIORef 0
         runTypad (inferTypeTL expr) (TypadST vtenv tcl dcl fref)
+    where (LProg vtenv tcl dcl _) = prog
+
+runTypadInProgram :: LProg -> Typad a -> IO (Either TError a)
+runTypadInProgram prog typad = do
+        fref <- newIORef 0
+        runTypad typad (TypadST vtenv tcl dcl fref)
     where (LProg vtenv tcl dcl _) = prog
 
 -- loads and types checks the given program or throws an error

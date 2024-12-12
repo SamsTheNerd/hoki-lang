@@ -1,6 +1,6 @@
 module CoreLang.Typad where
 import CoreLang.CoreSorts
-import Data.Map hiding (null, (\\), map)
+import Data.Map hiding (foldr, null, (\\), map)
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef', writeIORef)
 import Control.Monad (ap, void, zipWithM, when)
 import Data.List (nub, (\\))
@@ -314,6 +314,26 @@ splitFun ty = do
     toMV <- newMetaTVar
     unifyType ty (TArrow (TMetaVar frMV) (TMetaVar toMV))
     return (TMetaVar frMV, TMetaVar toMV)
+
+-- this does not work
+getKind :: Type -> Typad TyKind
+getKind (TVar vid) = do
+    mtdcl <- lookupDC' vid 
+    case mtdcl of
+        Nothing -> return KStar
+        (Just (_,TypeCons _ [] _)) -> return KStar
+        (Just (_,TypeCons _ tvs _)) -> return $ foldr1 KArrow (map (const KStar) tvs) 
+getKind (TCon tcId tArgs) = do
+    (TypeCons _ tvs _) <- lookupTCon tcId
+    kArgs <- mapM getKind tArgs
+    let kzip = zipWith const (map Just kArgs <> repeat Nothing) tvs
+    return $ foldr (\mt acc -> case mt of
+                Nothing -> acc
+                (Just KStar) -> acc
+                (Just k) -> KArrow k acc
+            ) KStar kzip
+getKind _ = return KStar
+
 
 plzSlowDown :: Type -> Typad ()
 plzSlowDown ty@(TMetaVar (MetaTVar n _)) = if n > 25 then typadErr "WOAH TOO FAST" else return ()

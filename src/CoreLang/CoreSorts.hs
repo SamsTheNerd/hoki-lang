@@ -38,8 +38,18 @@ data DataCons = DataCons Ident [Type]-- a data constructor is made from a series
 -- constraints for typing. consider these semi-internal for the time being
 data TConstraint = CExact Type -- an exact type
                  | CAny 
+                 | CSome 
                 --  | TClass -- typeclasses in the future?
                 deriving (Show, Eq)
+
+data TyClass = TyClass Ident [CMethod] -- a type class with a name, 
+
+data CMethod = CMethod Ident Type (Maybe Expr) -- a typeclass method with a name, a type, and an optional default implementation
+
+data CInstance = CInstance Ident Type (Map Ident Expr)  
+
+data TyKind = KStar | KConstraint | KArrow TyKind TyKind
+    deriving (Show, Eq)
 
 data MetaTVar = MetaTVar Int (IORef TConstraint) -- a meta variable used to build up found constraints
               | MetaStrVar String (IORef TConstraint) -- a hack to make letrec the tiniest bit easier
