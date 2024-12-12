@@ -37,6 +37,31 @@ eval (ECase inp ((p, pe):ps)) = do
         (Just ve) -> extendVarEnv' ve (eval (varSubs ve pe))
         Nothing -> eval (ECase inp ps)
 
+
+evalStrict :: Expr -> Runad Expr
+evalStrict e1@(EVar vid) = do -- immediately substitute it
+    me2 <- lookupVar vid
+    case me2 of
+        (Just (EVar vid')) | vid == vid' -> return e1
+        (Just e2) -> evalStrict e2
+        Nothing -> return e1
+evalStrict e1@(ELit _) = return e1
+evalStrict e1@(ELambda _ _) = return e1 -- not lazy but not useful perhaps?
+evalStrict e1@(EPrimOp _) = return e1 
+evalStrict e1@(ECons dcId evs) = ECons dcId <$> mapM evalStrict evs
+evalStrict (EApp (ELambda argId body) arg) = extendVarEnv argId arg (evalStrict (varSub argId arg body))
+evalStrict (EApp (EPrimOp (PrimOp pop _ _)) arg) = pop arg
+evalStrict (EApp func arg) = do
+    eF <- evalStrict func
+    evalStrict (EApp eF arg)
+evalStrict e1@(ECase _ []) = runadErr $ "Non-exhaustive patterns in: " ++ show e1
+evalStrict (ECase inp ((p, pe):ps)) = do
+    res <- runMaybeT $ patternMatch p inp
+    case res of
+        (Just ve) -> extendVarEnv' ve (evalStrict (varSubs ve pe))
+        Nothing -> evalStrict (ECase inp ps)
+
+
 -- `varSub v new in` substitutes the given variable with the new expression in the other expression
 varSub :: Ident -> Expr -> Expr -> Expr
 varSub v newExpr inExp@(EVar vid) = if vid == v then newExpr else inExp

@@ -13,6 +13,7 @@ import Control.Monad (foldM)
 import Data.List ((\\))
 import Data.Maybe (fromMaybe)
 import CoreLang.PrimDoubles (primDoubleOps)
+import CoreLang.PrimMeta (primMetaOps)
 
 -- gathering primitve groups
 
@@ -34,7 +35,8 @@ coreProg = do
 primGroups :: [[(String, Expr)]]
 primGroups = [
     primIntOps,
-    primDoubleOps
+    primDoubleOps,
+    primMetaOps
     ]
 
 allPrimOps :: [(String, Expr)]

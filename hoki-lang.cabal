@@ -63,6 +63,7 @@ library
                      CoreLang.CoreRepl,
                      CoreLang.CoreParser,
                      CoreLang.PrimIntegers,
+                     CoreLang.PrimMeta,
                      CoreLang.PrimDoubles,
                      CoreLang.CoreLoader,
                      CoreLang.Runad,

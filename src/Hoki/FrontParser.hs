@@ -121,26 +121,51 @@ abbP = do args <- many1 $ do {v <- varP; wsP'; return v}
           body <- sepBy1 exprP wsP'
           return $ Eabb (last args) (init args) body Nothing
 
+--funcP :: Parser Ident
+--funcP = foldr1 (<|>) $ map string
+--           [
+--            "<-", "->", "<><", "<>", "><", "<>[<", "<>]<",
+--             "+",  "-",   "×",  "÷",  "=",    ">",    "<",
+--            "<<", "<<",   "∠",  "⦤",  "ⁿ"
+--           ]
+
 funcP :: Parser Ident
-funcP = foldr1 (<|>) $ map string
-           [
-            "<-", "->", "<><", "<>", "><", "<>[<", "<>]<",
-             "+",  "-",   "×",  "÷",  "=",    ">",    "<",
-            "<<", "<<",   "∠",  "⦤",  "ⁿ"
-           ]
+funcP = foldr1 (<|>) $ map (foldr1 (<|>) . map string) 
+    [
+        ["<-"],
+        ["->"],
+        ["<><","cons"],
+        ["<>","encap"],
+        ["><","append"],
+        ["<>[<","tail"],
+        ["<>]<","head"],
+        ["+","add"],
+        ["-","sub","subtract"],
+        ["×","mult","multiply"],
+        ["÷","div"],
+        ["="],
+        [">"],
+        ["<"],
+        ["<<","fold"],
+        [">>","map"],
+        ["∠","cos"], 
+        ["⦤","acos","arccos"],
+        ["ⁿ","pow"]
+    ]
 
 
 argP :: Int -> Parser [Args]
-argP n = count n (do {a <- (Alit <$> litP) <|> Avar <$> varP; wsP'; return a})
+argP n = many (do {a <- (Alit <$> litP) <|> Avar <$> varP; wsP'; return a})
 
 appP :: Parser Expr
-appP = do args <- argP 10
+appP = do args <- argP 1
           f <- funcP
           return $ Eapp f args  
+
 exprP :: Parser Expr
-exprP = try  $  Elit <$> litP
-            <|> abbP
+exprP = try  $  abbP
             <|> appP
+            <|> Elit <$> litP
             <|> Evar <$> varP
 
 line :: Parser String

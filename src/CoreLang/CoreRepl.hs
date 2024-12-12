@@ -2,11 +2,15 @@ module CoreLang.CoreRepl where
 import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets)
 import CoreLang.CoreSorts
 import CoreLang.CoreParser (readProgramFile, parseExpr)
-import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg)
+import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg, loadStatement, fillTL)
 import System.Console.Haskeline
 import Data.Maybe (fromMaybe)
-import Data.Map (keys)
+import Data.Map (keys, insert)
 import CoreLang.CoreCompiler (haskellifyExpr, haskellifyProg)
+import Control.Applicative (Applicative(liftA2))
+import Text.Parsec (ParseError)
+import CoreLang.Typad (TError)
+import CoreLang.CoreTyping (inferTypeTLRec)
 
 -- Core Repl Monad
 type CReplad a = InputT (StateT (Maybe FilePath, LProg) IO) a
@@ -35,7 +39,7 @@ creplDispatch "h" expr = creplAct (\_ -> return . haskellifyExpr) expr
 creplDispatch "hl" _ = do
     mayFP <- lift (gets fst)
     mrrp <- liftIO $ maybe (return $ Right []) readProgramFile mayFP
-    outputStrLn $ either show haskellifyProg mrrp 
+    outputStrLn $ either show haskellifyProg mrrp
 creplDispatch "tAll" _ = lift (gets snd) >>= \(LProg _ _ _ venv) -> mapM_ creplInferType (keys venv)
 creplDispatch "help" _ = outputStrLn $ "\nWelcome to the crepl! (core repl) \n\
                                        \You can enter expressions to evaluate them in the context of the currently loaded program or use one of the following commands:\n\n\
@@ -47,16 +51,34 @@ creplDispatch "help" _ = outputStrLn $ "\nWelcome to the crepl! (core repl) \n\
 creplDispatch cmd _ = outputStrLn $ "unknown command :"  ++ cmd ++ "\n\tuse :help to see all available commands"
 
 creplInferType :: String -> CReplad ()
-creplInferType expr = creplAct ((\case
-            (Left err) -> ("error: " ++ err)
-            (Right resVal) -> show expr ++ " :: " ++ show resVal)
-        <$:> inferInProgram) expr
+creplInferType inp = creplHandleExpr inp >>= maybe (return ()) 
+    (\(_, ty) -> do outputStrLn (inp ++ " :: " ++ show ty))
 
 creplEval :: String -> CReplad ()
-creplEval expr = creplAct ((\case
-            (Left err) -> ("error: " ++ err)
-            (Right resVal) -> show resVal)
-        <$:> evalProgram) expr
+creplEval inp = creplHandleExpr inp >>= maybe (return ()) (\(expr, _) -> do
+        lprog <- lift (gets snd);
+        liftIO (evalProgram lprog expr) >>= outputStrLn . either ("error: " ++) show)
+
+creplBind :: Ident -> String -> CReplad ()
+creplBind vid inp = creplHandleExpr inp >>= maybe (return ()) (\(expr, _) -> do
+        (fn, lprog@(LProg vtenv tcl dcl venv)) <- lift get
+        liftIO (evalProgram lprog expr) >>= either (outputStrLn . ("error: " ++)) (\expr' -> do
+            lprog' <- liftIO $ fillTL $ loadStatement (SLetRec vid expr' Nothing) lprog
+            lift $ put (fn, lprog')
+            ))
+
+creplHandleExpr :: String -> CReplad (Maybe (Expr, Type))
+creplHandleExpr inp = do
+    let errExpr = parseExpr inp
+    case errExpr of
+        (Left err) -> Nothing <$ outputStrLn ("parse error: " ++ show err)
+        (Right expr) -> do
+                lprog <- lift (gets snd)
+                errOrType <- liftIO $ inferInProgram lprog expr
+                case errOrType of
+                    (Left err) -> Nothing <$ outputStrLn (show err)
+                    (Right ty) -> return . Just $ (expr, ty)
+
 
 (<$:>) :: Monad m => (c -> d) -> (a -> b -> m c) -> a -> b -> m d
 af <$:> f = \x y -> af <$> f x y
@@ -76,10 +98,10 @@ creplLoop = do
         (':':inps) -> creplDispatch cmd (unwords args)
             where (cmd:args) = words inps
         "" -> return ()
-        _ ->  creplAct ((\case
-            (Left err) -> ("error: " ++ err)
-            (Right resVal) -> show resVal)
-            <$:> evalProgram) inp
+        _ ->  case words inp of
+            ("let":x:"=":exprStr) -> creplBind x (unwords exprStr)
+            _ -> creplEval inp
+
     creplLoop
 
 startCrepl :: IO ()
