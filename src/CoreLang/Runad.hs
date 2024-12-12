@@ -35,6 +35,10 @@ instance Applicative Runad where
 
     (<*>) = ap
 
+-- lifts IO monads into this monad
+lift :: IO a -> Runad a
+lift iom = Runad $ \st -> (,passInOut st) . Right <$> iom
+
 -- prefer these semi-internal?
 
 getRST :: Runad RunadSTIn

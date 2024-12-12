@@ -2,7 +2,7 @@ module CoreLang.CoreRepl where
 import Control.Monad.State.Strict (StateT (..), lift, put, get, MonadIO (liftIO), gets)
 import CoreLang.CoreSorts
 import CoreLang.CoreParser (readProgramFile, parseExpr)
-import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg, loadStatement, fillTL)
+import CoreLang.CoreLoader (evalProgram, inferInProgram, LProg (LProg), loadProgram, coreProg, loadStatement, fillTL, checkDepSCC)
 import System.Console.Haskeline
 import Data.Maybe (fromMaybe)
 import Data.Map (keys, insert)
@@ -51,7 +51,7 @@ creplDispatch "help" _ = outputStrLn $ "\nWelcome to the crepl! (core repl) \n\
 creplDispatch cmd _ = outputStrLn $ "unknown command :"  ++ cmd ++ "\n\tuse :help to see all available commands"
 
 creplInferType :: String -> CReplad ()
-creplInferType inp = creplHandleExpr inp >>= maybe (return ()) 
+creplInferType inp = creplHandleExpr inp >>= maybe (return ())
     (\(_, ty) -> do outputStrLn (inp ++ " :: " ++ show ty))
 
 creplEval :: String -> CReplad ()
@@ -61,10 +61,13 @@ creplEval inp = creplHandleExpr inp >>= maybe (return ()) (\(expr, _) -> do
 
 creplBind :: Ident -> String -> CReplad ()
 creplBind vid inp = creplHandleExpr inp >>= maybe (return ()) (\(expr, _) -> do
-        (fn, lprog@(LProg vtenv tcl dcl venv)) <- lift get
+        (fn, lprog) <- lift get
         liftIO (evalProgram lprog expr) >>= either (outputStrLn . ("error: " ++)) (\expr' -> do
             lprog' <- liftIO $ fillTL $ loadStatement (SLetRec vid expr' Nothing) lprog
-            lift $ put (fn, lprog')
+            liftIO (checkDepSCC lprog' [vid]) >>= (\case
+                (Left err) -> outputStrLn err
+                (Right lprog'') -> lift $ put (fn, lprog'')
+                )
             ))
 
 creplHandleExpr :: String -> CReplad (Maybe (Expr, Type))

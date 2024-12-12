@@ -1,0 +1,6 @@
+
+
+let alphaCapture = \f -> \g -> \x -> case x of
+    _ -> (\f -> f x) g;
+
+let alphaCaptureTest = (alphaCapture (intAdd 0) (intAdd 10) 5)

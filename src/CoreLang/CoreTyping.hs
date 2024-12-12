@@ -84,26 +84,18 @@ typeType (EApp fun arg) (TInfer mv) = do
     argTy <- inferType arg
     void $ unifyType fTy (TArrow argTy (TMetaVar mv))
 
--- does type constructed stuff Just Work?? appears to. come back here (and review pre-cleanup git history) if this bites us later.
-typeType (ECons dcId es) expd = do
+typeType expr@(ECons dcId es) expd = do
     (DataCons _ dcArgs, _) <- lookupDC dcId
     when (length dcArgs /= length es) (typadErr $ "Wrong number of arguments for data constructor: " ++ dcId)
-
-    -- mvs <- mapM (const $ TMetaVar <$> newMetaTVar) tvs -- a meta var for each type cons tvar
-    -- let subst = fromList $ zip tvs mvs
-    -- let sArgs = map (substType subst) dcArgs -- replace tvars with placeholders in dc arg types
-
-    -- let tconInst = TCon tcId mvs -- tcon type with holes
-
     emvs <- mapM (const newMetaTVar) es -- a metavar for each sub expression in the dc
-    tconInst <- unifyCons dcId (map TMetaVar emvs) -- a tcon type with holes corresponding to the expression types
-
     case expd of
             (TInfer mv) -> do 
-                mapM_ (\(ex, mv') -> typeType ex (TInfer mv')) (zip es emvs) -- infer sub expressions 
-                unifyType (TMetaVar mv) tconInst -- return full tcon (holes should now be filled)
+                emvs' <- mapM (\(ex, mv') -> mv' <$ typeType ex (TInfer mv')) (zip es emvs) >>= mapM (zonkType . TMetaVar) -- infer sub expressions 
+                tconInst <- unifyCons dcId emvs'
+                instType' tconInst expd
                 return ()
             (TCheck chTy) -> do
+                tconInst <- unifyCons dcId (map TMetaVar emvs)
                 unifyType chTy tconInst -- fill holes 
                 mapM_ (\(ex, mv') -> typeType ex (TCheck (TMetaVar mv'))) (zip es emvs) -- check sub expressions 
 

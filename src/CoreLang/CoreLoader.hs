@@ -62,7 +62,7 @@ loadStatement (STypeDef tcon@(TypeCons name _ dcs)) (LProg vtenv tcl dcl venv) =
 typeDCLambda :: TypeCons -> DataCons -> Type
 typeDCLambda (TypeCons name tvs _) (DataCons _ ts) =
     if null tvs then bodyT else TQuant (map (\tv -> (tv,CExact $ TVar tv)) tvs) bodyT
-    where bodyT = foldr TArrow (TCon name (map TVar tvs)) ts -- TODO: this should probably get quantified? do that later :p
+    where bodyT = foldr TArrow (TCon name (map TVar tvs)) ts
 
 -- makes a lambda to be used for constructing datacons
 mkDCLambda :: DataCons -> Expr

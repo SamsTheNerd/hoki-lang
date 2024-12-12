@@ -4,8 +4,17 @@ import Control.Monad.State
 import Data.Map ( empty, singleton, Map, toList )
 import CoreLang.CoreSorts
 import CoreLang.Runad
+    ( runRunAd,
+      runadErr,
+      lookupVar,
+      lookupDC,
+      extendVarEnv,
+      extendVarEnv', getRST )
+import qualified CoreLang.Runad as Runad (lift)
 import Control.Monad.Trans.Maybe (MaybeT (..), mapMaybeT)
 import qualified Data.Bifunctor
+import System.Console.Haskeline (outputStrLn)
+import Control.Applicative (Applicative(liftA2))
 
 type Subst = Map Ident Expr -- subst maps for laziness
 
@@ -30,12 +39,14 @@ eval (EApp (EPrimOp (PrimOp pop _ _)) arg) = pop arg
 eval (EApp func arg) = do
     eF <- eval func
     eval (EApp eF arg)
-eval e1@(ECase _ []) = runadErr $ "Non-exhaustive patterns in: " ++ show e1
-eval (ECase inp ((p, pe):ps)) = do
-    res <- runMaybeT $ patternMatch p inp
-    case res of
-        (Just ve) -> extendVarEnv' ve (eval (varSubs ve pe))
-        Nothing -> eval (ECase inp ps)
+eval expr@(ECase inp pats) = checkCase pats
+    where checkCase ((p, pe):ps) = do
+                -- Runad.lift $ putStrLn $ "checking " ++ show expr
+                res <- runMaybeT $ patternMatch p inp
+                case res of
+                    (Just ve) -> extendVarEnv' ve (eval (varSubs ve pe))
+                    Nothing -> checkCase ps
+          checkCase [] = runadErr $ "Non-exhaustive patterns in: " ++ show expr
 
 
 evalStrict :: Expr -> Runad Expr
@@ -46,30 +57,32 @@ evalStrict e1@(EVar vid) = do -- immediately substitute it
         (Just e2) -> evalStrict e2
         Nothing -> return e1
 evalStrict e1@(ELit _) = return e1
-evalStrict e1@(ELambda _ _) = return e1 -- not lazy but not useful perhaps?
-evalStrict e1@(EPrimOp _) = return e1 
+evalStrict e1@(ELambda arg body) = return e1
+evalStrict e1@(EPrimOp _) = return e1
 evalStrict e1@(ECons dcId evs) = ECons dcId <$> mapM evalStrict evs
 evalStrict (EApp (ELambda argId body) arg) = extendVarEnv argId arg (evalStrict (varSub argId arg body))
 evalStrict (EApp (EPrimOp (PrimOp pop _ _)) arg) = pop arg
 evalStrict (EApp func arg) = do
     eF <- evalStrict func
     evalStrict (EApp eF arg)
-evalStrict e1@(ECase _ []) = runadErr $ "Non-exhaustive patterns in: " ++ show e1
-evalStrict (ECase inp ((p, pe):ps)) = do
-    res <- runMaybeT $ patternMatch p inp
-    case res of
-        (Just ve) -> extendVarEnv' ve (evalStrict (varSubs ve pe))
-        Nothing -> evalStrict (ECase inp ps)
+evalStrict expr@(ECase inp pats) = checkCase pats
+    where checkCase ((p, pe):ps) = do
+                res <- runMaybeT $ patternMatch p inp
+                case res of
+                    (Just ve) -> extendVarEnv' ve (evalStrict (varSubs ve pe))
+                    Nothing -> checkCase ps
+          checkCase [] = runadErr $ "Non-exhaustive patterns in: " ++ show expr
 
 
 -- `varSub v new in` substitutes the given variable with the new expression in the other expression
 varSub :: Ident -> Expr -> Expr -> Expr
 varSub v newExpr inExp@(EVar vid) = if vid == v then newExpr else inExp
-varSub v newExpr (ELambda arg body) = ELambda arg (varSub v newExpr body)
+varSub v newExpr (ELambda arg body) | v /= arg = ELambda arg (varSub v newExpr body)
 varSub v newExpr (EApp func arg) = EApp (varSub v newExpr func) (varSub v newExpr arg)
 varSub v newExpr (ECons name es) = ECons name (map (varSub v newExpr) es)
-varSub v newExpr (ECase inp ps) = ECase (varSub v newExpr inp)
+varSub v newExpr (ECase inp ps) | v `notElem` bs = ECase (varSub v newExpr inp)
     (map (Data.Bifunctor.second (varSub v newExpr)) ps)
+    where bs = concatMap (getBindersP . fst) ps
 varSub _ _ inExp = inExp
 
 varSubs :: VarEnv -> Expr -> Expr
@@ -91,7 +104,7 @@ patternMatch (PVar v) expr =
         ) (MaybeT $ lookupDC v)
 
 patternMatch (PLabel v p) expr = singleton v expr <$ patternMatch p expr
-patternMatch (PCons _ ps) expr = do
+patternMatch pat@(PCons _ ps) expr = do
     expr' <- (lift . eval) expr -- need to check the expression so eval it
     case expr' of
         (ECons _ fields) -> if length fields /= length ps then MaybeT $ return Nothing
