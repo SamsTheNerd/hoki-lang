@@ -48,10 +48,9 @@ hokiToCoreExpr lp@(LProg tenv a b venv) (Hoki.Eabb name args exprs ts) = (lprog'
         expr = case args of
             [] -> head exprscl
             xs -> foldr Core.ELambda (Core.ELambda (last xs) (head exprscl)) (init xs)
-        typesig = case ts of
-            Just t  -> hokiToCoreType t
-            Nothing -> throw Unimplemented
-        tenv' = insert name typesig tenv
+        tenv' = case ts of
+            Just t  -> insert name (hokiToCoreType t) tenv
+            Nothing tenv
         venv' = insert name expr venv
         lprog' = LProg tenv' a b venv'
 hokiToCoreExpr lprog (Hoki.Econs x) = (lprog,Core.ECons x [])
